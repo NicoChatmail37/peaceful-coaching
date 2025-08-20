@@ -142,10 +142,12 @@ export const InvoicePreview = ({ invoice, companyInfo }: InvoicePreviewProps) =>
                     <span>Sous-total:</span>
                     <span>CHF {invoice.total.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>TVA 7.7%:</span>
-                    <span>CHF {invoice.tva.toFixed(2)}</span>
-                  </div>
+                  {invoice.tva > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>TVA 7.7%:</span>
+                      <span>CHF {invoice.tva.toFixed(2)}</span>
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total:</span>

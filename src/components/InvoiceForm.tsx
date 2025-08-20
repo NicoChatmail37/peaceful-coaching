@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2 } from "lucide-react";
 import { Invoice, InvoiceItem, CompanyInfo } from "@/pages/Index";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +22,8 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
     clientAddress: "",
     clientNPA: "",
     clientCity: "",
-    notes: ""
+    notes: "",
+    includeTva: false
   });
   
   const [items, setItems] = useState<InvoiceItem[]>([
@@ -51,7 +53,7 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
 
   const calculateTotals = () => {
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-    const tva = subtotal * 0.077; // TVA suisse 7.7%
+    const tva = formData.includeTva ? subtotal * 0.077 : 0; // TVA suisse 7.7%
     const totalWithTva = subtotal + tva;
     
     return { subtotal, tva, totalWithTva };
@@ -94,8 +96,8 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
       clientCity: formData.clientCity,
       items: items.filter(item => item.description && item.price > 0),
       total: subtotal,
-      tva,
-      totalWithTva,
+      tva: formData.includeTva ? tva : 0,
+      totalWithTva: formData.includeTva ? totalWithTva : subtotal,
       notes: formData.notes,
       status: 'draft'
     };
@@ -113,7 +115,8 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
       clientAddress: "",
       clientNPA: "",
       clientCity: "",
-      notes: ""
+      notes: "",
+      includeTva: false
     });
     setItems([{ description: "", quantity: 1, price: 0, total: 0 }]);
   };
@@ -253,18 +256,30 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
           <CardTitle>💰 Total de la facture</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="flex items-center justify-between mb-4">
+            <Label htmlFor="includeTva" className="text-sm font-medium">
+              Inclure la TVA (7.7%)
+            </Label>
+            <Switch
+              id="includeTva"
+              checked={formData.includeTva}
+              onCheckedChange={(checked) => setFormData({ ...formData, includeTva: checked })}
+            />
+          </div>
           <div className="flex justify-between">
             <span>Sous-total:</span>
             <span>CHF {subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between">
-            <span>TVA (7.7%):</span>
-            <span>CHF {tva.toFixed(2)}</span>
-          </div>
+          {formData.includeTva && (
+            <div className="flex justify-between">
+              <span>TVA (7.7%):</span>
+              <span>CHF {tva.toFixed(2)}</span>
+            </div>
+          )}
           <Separator />
           <div className="flex justify-between text-lg font-semibold">
             <span>Total:</span>
-            <span>CHF {totalWithTva.toFixed(2)}</span>
+            <span>CHF {(formData.includeTva ? totalWithTva : subtotal).toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>
