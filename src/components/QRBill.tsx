@@ -15,34 +15,39 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
 
   // Génération du QR code Swiss QR-Bill conforme aux standards
   const generateQRData = () => {
+    // Validation et nettoyage des données
+    const cleanIBAN = companyInfo.iban.replace(/\s/g, '').toUpperCase();
+    const amount = invoice.totalWithTva > 0 ? invoice.totalWithTva.toFixed(2) : '';
+    
     const qrData = [
       "SPC", // QR-Type
       "0200", // Version
-      "1", // Coding Type
-      companyInfo.iban.replace(/\s/g, ''), // IBAN
-      "K", // Creditor Address Type (K = structured)
-      companyInfo.name.substring(0, 70),
-      companyInfo.address.substring(0, 70),
-      companyInfo.npa,
-      companyInfo.city.substring(0, 35),
-      "CH", // Country
-      "", // Ultimate Creditor Address Type
-      "", // Ultimate Creditor Name
-      "", // Ultimate Creditor Address
-      "", // Ultimate Creditor Postal Code
-      "", // Ultimate Creditor City
-      "", // Ultimate Creditor Country
-      invoice.totalWithTva.toFixed(2), // Amount
+      "1", // Coding Type (UTF-8)
+      cleanIBAN, // IBAN sans espaces
+      "S", // Creditor Address Type (S = structured address)
+      companyInfo.name.trim().substring(0, 70),
+      companyInfo.address.trim().substring(0, 70),
+      companyInfo.npa.toString(),
+      companyInfo.city.trim().substring(0, 35),
+      "CH", // Creditor Country
+      "", // Ultimate Creditor Address Type (vide)
+      "", // Ultimate Creditor Name (vide)
+      "", // Ultimate Creditor Street (vide)
+      "", // Ultimate Creditor Building Number (vide)
+      "", // Ultimate Creditor Postal Code (vide)
+      "", // Ultimate Creditor City (vide)
+      "", // Ultimate Creditor Country (vide)
+      amount, // Amount (vide si 0 ou formaté avec 2 décimales)
       "CHF", // Currency
-      "K", // Debtor Address Type
-      invoice.clientName.substring(0, 70),
-      invoice.clientAddress.substring(0, 70),
-      invoice.clientNPA,
-      invoice.clientCity.substring(0, 35),
-      "CH", // Debtor Country
-      "", // Payment Reference Type
-      "", // Payment Reference
-      invoice.notes?.substring(0, 140) || `Facture ${invoice.number}`, // Additional Information
+      "S", // Ultimate Debtor Address Type (S = structured)
+      invoice.clientName.trim().substring(0, 70),
+      invoice.clientAddress.trim().substring(0, 70),
+      invoice.clientNPA.toString(),
+      invoice.clientCity.trim().substring(0, 35),
+      "CH", // Ultimate Debtor Country
+      "NON", // Payment Reference Type (NON = pas de référence)
+      "", // Payment Reference (vide car NON)
+      (invoice.notes?.trim().substring(0, 140) || `Facture ${invoice.number}`), // Additional Information
       "EPD", // Alternative Procedure
       "" // Alternative Procedure Parameters
     ].join('\r\n');
