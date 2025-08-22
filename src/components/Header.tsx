@@ -1,6 +1,10 @@
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { LogOut, User } from "lucide-react";
 
 export const Header = () => {
+  const { user, signOut } = useAuth();
+
   return (
     <header className="bg-card border-b shadow-soft">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -15,12 +19,23 @@ export const Header = () => {
         </div>
         
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm">
-            📊 Statistiques
-          </Button>
-          <Button size="sm" className="bg-gradient-primary hover:bg-primary/90">
-            💾 Sauvegarder
-          </Button>
+          {user && (
+            <>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>{user.email}</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => signOut()}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Déconnexion
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>
