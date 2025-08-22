@@ -13,74 +13,140 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [qrGenerated, setQrGenerated] = useState(false);
 
-  // Génération du QR code Swiss QR-Bill conforme aux standards
-  const generateQRData = () => {
-    // Validation et nettoyage des données
-    const cleanIBAN = companyInfo.iban.replace(/\s/g, '').toUpperCase();
-    const amount = invoice.totalWithTva > 0 ? invoice.totalWithTva.toFixed(2) : '';
-    
-    const qrData = [
-      "SPC", // QR-Type
-      "0200", // Version
-      "1", // Coding Type (UTF-8)
-      cleanIBAN, // IBAN sans espaces
-      "S", // Creditor Address Type (S = structured address)
-      companyInfo.name.trim().substring(0, 70),
-      companyInfo.address.trim().substring(0, 70),
-      companyInfo.npa.toString(),
-      companyInfo.city.trim().substring(0, 35),
-      "CH", // Creditor Country
-      "", // Ultimate Creditor Address Type (vide)
-      "", // Ultimate Creditor Name (vide)
-      "", // Ultimate Creditor Street (vide)
-      "", // Ultimate Creditor Building Number (vide)
-      "", // Ultimate Creditor Postal Code (vide)
-      "", // Ultimate Creditor City (vide)
-      "", // Ultimate Creditor Country (vide)
-      amount, // Amount (vide si 0 ou formaté avec 2 décimales)
-      "CHF", // Currency
-      "S", // Ultimate Debtor Address Type (S = structured)
-      invoice.clientName.trim().substring(0, 70),
-      invoice.clientAddress.trim().substring(0, 70),
-      invoice.clientNPA.toString(),
-      invoice.clientCity.trim().substring(0, 35),
-      "CH", // Ultimate Debtor Country
-      "NON", // Payment Reference Type (NON = pas de référence)
-      "", // Payment Reference (vide car NON)
-      (invoice.notes?.trim().substring(0, 140) || `Facture ${invoice.number}`), // Additional Information
-      "EPD", // Alternative Procedure
-      "" // Alternative Procedure Parameters
-    ].join('\r\n');
+  // -----------------------------
+  // Helpers
+  // -----------------------------
+  const CRLF = "\r\n";
+  const t70 = (s?: string) => (s ?? "").trim().slice(0, 70);
+  const t35 = (s?: string) => (s ?? "").trim().slice(0, 35);
 
-    return qrData;
+  // Découpe best‑effort "Rue 12A" -> { street: "Rue", number: "12A" }
+  function splitStreet(address: string) {
+    const m = (address || "").match(/^(.+?)\s+(\d+[a-zA-Z]?)\s*$/);
+    return m ? { street: m[1], number: m[2] } : { street: address || "", number: "" };
+  }
+
+  function buildStructuredAddress(
+    name: string,
+    line: string,
+    postal: string | number,
+    city: string,
+    country = "CH"
+  ) {
+    const { street, number } = splitStreet(line);
+    return [
+      "S",                  // Address Type (structured)
+      t70(name),            // Name
+      t70(street),          // Street
+      (number ?? "").toString(), // Building number (can be empty but MUST exist)
+      String(postal ?? ""), // Postal code
+      t35(city),            // Town
+      (country || "CH").toUpperCase(), // Country (ISO-2)
+    ];
+  }
+
+  // Détection simple d'un QR‑IBAN (éviter avec Reference Type = NON)
+  function looksLikeQrIban(ibanNoSpace: string) {
+    const m = ibanNoSpace.replace(/\s/g, "").toUpperCase().match(/^CH\d{2}(\d{5})/);
+    if (!m) return false;
+    const iid = parseInt(m[1], 10);
+    return iid >= 30000 && iid <= 31999;
+  }
+
+  // -----------------------------
+  // Génération du payload Swiss QR-bill
+  // -----------------------------
+  const generateQRData = () => {
+    const cleanIBAN = companyInfo.iban.replace(/\s/g, "").toUpperCase();
+    const amount = invoice.totalWithTva > 0 ? invoice.totalWithTva.toFixed(2) : "";
+
+    // Si on utilise NON (pas de référence), éviter un QR‑IBAN
+    if (looksLikeQrIban(cleanIBAN)) {
+      console.warn(
+        "IBAN détecté comme QR‑IBAN alors que Reference Type = NON. Utilise un IBAN standard."
+      );
+    }
+
+    // Creditor (bénéficiaire)
+    const creditor = buildStructuredAddress(
+      companyInfo.name,
+      companyInfo.address,
+      companyInfo.npa,
+      companyInfo.city,
+      "CH"
+    );
+
+    // Ultimate Creditor (non utilisé) => 7 lignes vides
+    const ultimateCreditor = ["", "", "", "", "", "", ""];
+
+    // Debtor (payeur)
+    const debtor = buildStructuredAddress(
+      invoice.clientName,
+      invoice.clientAddress,
+      invoice.clientNPA,
+      invoice.clientCity,
+      "CH"
+    );
+
+    // Référence: NON + champ vide (IBAN normal)
+    const reference = ["NON", ""];
+
+    // Infos libres (140 max)
+    const additionalInfo =
+      (invoice.notes?.trim().slice(0, 140)) || `Facture ${invoice.number}`;
+
+    // Trailer + Billing Info + AP1 + AP2 (même vides)
+    const trailerAndAlts = ["EPD", "", "", ""];
+
+    const lines = [
+      "SPC",      // Header
+      "0200",     // Version
+      "1",        // Coding (UTF-8)
+      cleanIBAN,  // IBAN (sans espaces)
+      ...creditor,            // 7 lignes
+      ...ultimateCreditor,    // 7 lignes
+      amount,     // Montant (vide si 0)
+      "CHF",      // Devise
+      ...debtor,              // 7 lignes
+      ...reference,           // 2 lignes
+      t70(additionalInfo),    // Additional Information
+      ...trailerAndAlts,      // 4 lignes
+    ];
+
+    return lines.join(CRLF);
   };
 
+  // -----------------------------
+  // Génération du QR sur canvas
+  // -----------------------------
   useEffect(() => {
     const generateQR = async () => {
       if (canvasRef.current) {
         try {
           const qrData = generateQRData();
           await QRCode.toCanvas(canvasRef.current, qrData, {
-            width: 128,
+            width: 160,
             margin: 0,
             color: {
-              dark: '#000000',
-              light: '#FFFFFF',
+              dark: "#000000",
+              light: "#FFFFFF",
             },
-            errorCorrectionLevel: 'M',
+            errorCorrectionLevel: "M",
           });
           setQrGenerated(true);
         } catch (error) {
-          console.error('Erreur lors de la génération du QR code:', error);
+          console.error("Erreur lors de la génération du QR code:", error);
+          setQrGenerated(false);
         }
       }
     };
 
     generateQR();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice, companyInfo]);
 
   const formatIBAN = (iban: string) => {
-    return iban.replace(/(.{4})/g, '$1 ').trim();
+    return iban.replace(/(.{4})/g, "$1 ").trim();
   };
 
   return (
@@ -89,7 +155,7 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
         {/* Section de réception */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold">Section de réception</h3>
-          
+
           <div className="text-xs space-y-1">
             <div className="font-medium">Compte / Payable à</div>
             <div>{formatIBAN(companyInfo.iban)}</div>
@@ -120,21 +186,24 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
         {/* Section de paiement avec QR Code */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold">Section de paiement</h3>
-          
-          {/* QR Code - Vrai QR code Swiss QR-Bill */}
+
+          {/* QR Code - Swiss QR-Bill */}
           <div className="flex justify-center">
             <div className="relative">
-              <canvas 
+              <canvas
                 ref={canvasRef}
                 className="border border-muted-foreground/20 bg-white"
-                style={{ width: '128px', height: '128px' }}
+                style={{ width: "160px", height: "160px" }}
               />
               {!qrGenerated && (
                 <div className="absolute inset-0 flex items-center justify-center bg-muted/50 text-muted-foreground text-xs">
                   Génération...
                 </div>
               )}
-              {/* Croix suisse au centre du QR code */}
+
+              {/* NOTE: pour valider le scan, on laisse la croix suisse désactivée.
+                  Tu pourras la remettre plus tard en version plus petite si souhaité. */}
+              {/*
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-6 h-6 bg-white border border-muted-foreground flex items-center justify-center">
                   <div className="w-4 h-4 bg-red-600 flex items-center justify-center text-white text-xs font-bold">
@@ -142,6 +211,7 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
                   </div>
                 </div>
               </div>
+              */}
             </div>
           </div>
 
@@ -175,11 +245,16 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
               <div className="text-lg font-bold">{invoice.totalWithTva.toFixed(2)}</div>
             </div>
           </div>
+
+          {/* Bouton debug (facultatif) : affiche les lignes exactes */}
+          {/* <button className="text-xs underline" onClick={() => console.log(generateQRData())}>
+            Voir les lignes QR
+          </button> */}
         </div>
       </div>
 
       <div className="mt-4 text-xs text-muted-foreground text-center">
-        ✅ QR-Code Swiss QR-Bill conforme aux standards suisses - Prêt pour impression et paiement
+        ✅ QR-code Swiss QR-bill généré (structure conforme). Scanne d'abord sans impression pour valider.
       </div>
     </div>
   );
