@@ -59,6 +59,9 @@
 
     --radius: 0.5rem;
 
+    /* Company theme variable for multi-enterprise support */
+    --company-theme: 214 84% 56%;
+
     --sidebar-background: 0 0% 98%;
 
     --sidebar-foreground: 240 5.3% 26.1%;

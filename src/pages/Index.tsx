@@ -5,6 +5,9 @@ import { InvoicePreview } from "@/components/InvoicePreview";
 import { InvoiceList } from "@/components/InvoiceList";
 import { CompanySettings } from "@/components/CompanySettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCompany } from "@/hooks/useCompany";
+import Clients from "./Clients";
+import Products from "./Products";
 
 export interface Invoice {
   id: string;
@@ -42,6 +45,7 @@ export interface CompanyInfo {
 }
 
 const Index = () => {
+  const { activeCompany } = useCompany();
   const [currentTab, setCurrentTab] = useState("create");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -82,7 +86,7 @@ const Index = () => {
         </div>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:grid-cols-6">
             <TabsTrigger value="create" className="flex items-center gap-2">
               <span className="text-lg">📄</span>
               Créer
@@ -94,6 +98,14 @@ const Index = () => {
             <TabsTrigger value="list" className="flex items-center gap-2">
               <span className="text-lg">📋</span>
               Factures
+            </TabsTrigger>
+            <TabsTrigger value="clients" className="flex items-center gap-2">
+              <span className="text-lg">👥</span>
+              Clients
+            </TabsTrigger>
+            <TabsTrigger value="products" className="flex items-center gap-2">
+              <span className="text-lg">📦</span>
+              Produits
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <span className="text-lg">⚙️</span>
@@ -130,6 +142,14 @@ const Index = () => {
               invoices={invoices}
               onInvoiceSelect={handleInvoiceSelect}
             />
+          </TabsContent>
+
+          <TabsContent value="clients" className="space-y-6">
+            <Clients />
+          </TabsContent>
+
+          <TabsContent value="products" className="space-y-6">
+            <Products />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
