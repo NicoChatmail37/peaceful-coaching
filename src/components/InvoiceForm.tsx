@@ -9,6 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2 } from "lucide-react";
 import { Invoice, InvoiceItem, CompanyInfo } from "@/pages/Index";
 import { useToast } from "@/hooks/use-toast";
+import { ClientSelector } from "@/components/ClientSelector";
+import { ProductSelector } from "@/components/ProductSelector";
+import { Client } from "@/hooks/useClients";
+import { Product } from "@/hooks/useProducts";
 
 interface InvoiceFormProps {
   onInvoiceCreate: (invoice: Invoice) => void;
@@ -26,17 +30,23 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
     includeTva: false
   });
   
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  
   const [items, setItems] = useState<InvoiceItem[]>([
     { description: "", quantity: 1, price: 0, total: 0 }
   ]);
+  
+  const [selectedProducts, setSelectedProducts] = useState<(string | null)[]>([null]);
 
   const addItem = () => {
     setItems([...items, { description: "", quantity: 1, price: 0, total: 0 }]);
+    setSelectedProducts([...selectedProducts, null]);
   };
 
   const removeItem = (index: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== index));
+      setSelectedProducts(selectedProducts.filter((_, i) => i !== index));
     }
   };
 
@@ -49,6 +59,30 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
     }
     
     setItems(newItems);
+  };
+
+  const handleClientSelect = (client: Client | null) => {
+    setSelectedClient(client);
+    if (client) {
+      setFormData({
+        ...formData,
+        clientName: client.name,
+        clientAddress: client.address || "",
+        clientNPA: client.npa || "",
+        clientCity: client.city || ""
+      });
+    }
+  };
+
+  const handleProductSelect = (index: number, product: Product | null) => {
+    const newSelectedProducts = [...selectedProducts];
+    newSelectedProducts[index] = product?.id || null;
+    setSelectedProducts(newSelectedProducts);
+    
+    if (product) {
+      updateItem(index, 'description', product.name);
+      updateItem(index, 'price', product.price);
+    }
   };
 
   const calculateTotals = () => {
@@ -119,6 +153,8 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
       includeTva: false
     });
     setItems([{ description: "", quantity: 1, price: 0, total: 0 }]);
+    setSelectedClient(null);
+    setSelectedProducts([null]);
   };
 
   const { subtotal, tva, totalWithTva } = calculateTotals();
@@ -135,6 +171,16 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Sélectionner un client</Label>
+              <ClientSelector
+                value={selectedClient?.id}
+                onSelect={handleClientSelect}
+              />
+            </div>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="clientName">Nom / Entreprise *</Label>
@@ -202,15 +248,24 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
                 )}
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2 space-y-2">
-                  <Label>Description *</Label>
-                  <Input
-                    value={item.description}
-                    onChange={(e) => updateItem(index, 'description', e.target.value)}
-                    placeholder="Description du service ou produit"
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Sélectionner un produit/service</Label>
+                  <ProductSelector
+                    value={selectedProducts[index] || undefined}
+                    onSelect={(product) => handleProductSelect(index, product)}
                   />
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="md:col-span-2 space-y-2">
+                    <Label>Description *</Label>
+                    <Input
+                      value={item.description}
+                      onChange={(e) => updateItem(index, 'description', e.target.value)}
+                      placeholder="Description du service ou produit"
+                    />
+                  </div>
                 <div className="space-y-2">
                   <Label>Quantité</Label>
                   <Input
@@ -235,8 +290,9 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
               <div className="text-right">
                 <span className="text-sm text-muted-foreground">Total: </span>
                 <span className="font-semibold">CHF {item.total.toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
-            </div>
           ))}
           
           <Button
