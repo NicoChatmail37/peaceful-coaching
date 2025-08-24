@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
-import { CompanySelector } from "@/components/CompanySelector";
+import { CompanyDropdown } from "@/components/CompanyDropdown";
 import { LogOut, User } from "lucide-react";
 
 export const Header = () => {
@@ -41,7 +41,7 @@ export const Header = () => {
         <div className="flex items-center space-x-3">
           {user && (
             <>
-              <CompanySelector />
+              <CompanyDropdown />
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <User className="h-4 w-4" />
                 <span>{user.email}</span>

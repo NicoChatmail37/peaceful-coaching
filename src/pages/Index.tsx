@@ -4,7 +4,9 @@ import { InvoiceForm } from "@/components/InvoiceForm";
 import { InvoicePreview } from "@/components/InvoicePreview";
 import { InvoiceList } from "@/components/InvoiceList";
 import { CompanySettings } from "@/components/CompanySettings";
+import { CompanyManagement } from "@/components/CompanyManagement";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { useCompany } from "@/hooks/useCompany";
 import Clients from "./Clients";
 import Products from "./Products";
@@ -153,6 +155,8 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
+            <CompanyManagement />
+            <Separator />
             <CompanySettings 
               companyInfo={companyInfo}
               onCompanyInfoChange={setCompanyInfo}
