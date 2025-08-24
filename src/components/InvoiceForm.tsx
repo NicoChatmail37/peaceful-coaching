@@ -80,7 +80,11 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
     setSelectedProducts(newSelectedProducts);
     
     if (product) {
-      updateItem(index, 'description', product.name);
+      // Utilise la description du produit si elle existe, sinon le nom
+      const description = product.description ? 
+        `${product.name} - ${product.description}` : 
+        product.name;
+      updateItem(index, 'description', description);
       updateItem(index, 'price', product.price);
     }
   };
