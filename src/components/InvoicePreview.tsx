@@ -1,18 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Invoice, CompanyInfo } from "@/pages/Index";
+import { Invoice } from "@/pages/Index";
 import { QRBill } from "@/components/QRBill";
 import { AccountingExport } from "@/components/AccountingExport";
 import { Download, Send, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/hooks/useCompany";
 
 interface InvoicePreviewProps {
   invoice: Invoice;
-  companyInfo: CompanyInfo;
 }
 
-export const InvoicePreview = ({ invoice, companyInfo }: InvoicePreviewProps) => {
+export const InvoicePreview = ({ invoice }: InvoicePreviewProps) => {
   const { toast } = useToast();
+  const { activeCompany } = useCompany();
 
   const handleExportPDF = () => {
     toast({
@@ -65,15 +66,15 @@ export const InvoicePreview = ({ invoice, companyInfo }: InvoicePreviewProps) =>
               {/* Informations entreprise */}
               <div className="space-y-1">
                 <h2 className="text-xl font-bold text-foreground uppercase">
-                  {companyInfo.name}
+                  {activeCompany?.name}
                 </h2>
                 <div className="text-sm text-muted-foreground">
-                  <p>{companyInfo.address}</p>
-                  <p>{companyInfo.npa} {companyInfo.city}</p>
-                  <p>Tél: {companyInfo.phone}</p>
-                  <p>{companyInfo.email}</p>
-                  {companyInfo.tvaNumber && (
-                    <p>N° TVA: {companyInfo.tvaNumber}</p>
+                  <p>{activeCompany?.address}</p>
+                  <p>{activeCompany?.npa} {activeCompany?.city}</p>
+                  <p>Tél: {activeCompany?.phone}</p>
+                  <p>{activeCompany?.email}</p>
+                  {activeCompany?.tva_number && (
+                    <p>N° TVA: {activeCompany?.tva_number}</p>
                   )}
                 </div>
               </div>
@@ -90,7 +91,7 @@ export const InvoicePreview = ({ invoice, companyInfo }: InvoicePreviewProps) =>
                 <div className="text-sm space-y-1">
                   <p>N° d'affilié/IDE: <span className="font-medium">{invoice.number}</span></p>
                   <p>N° AVS: 756.4750.1669.33</p>
-                  <p>{companyInfo.city}, le {new Date(invoice.date).toLocaleDateString('fr-CH')}</p>
+                  <p>{activeCompany?.city}, le {new Date(invoice.date).toLocaleDateString('fr-CH')}</p>
                 </div>
               </div>
             </div>
@@ -146,7 +147,7 @@ export const InvoicePreview = ({ invoice, companyInfo }: InvoicePreviewProps) =>
             {/* Ligne de séparation pour la section QR */}
             <div className="border-t border-dashed border-gray-400 pt-8 mt-auto">
               {/* QR-Bill en bas de page dans sa position officielle */}
-              <QRBill invoice={invoice} companyInfo={companyInfo} />
+              <QRBill invoice={invoice} />
             </div>
           </CardContent>
         </Card>

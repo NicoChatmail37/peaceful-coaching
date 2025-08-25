@@ -2,27 +2,59 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { CompanyInfo } from "@/pages/Index";
 import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/hooks/useCompany";
 import { Building, Save } from "lucide-react";
+import { useEffect, useState } from "react";
 
-interface CompanySettingsProps {
-  companyInfo: CompanyInfo;
-  onCompanyInfoChange: (info: CompanyInfo) => void;
-}
-
-export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySettingsProps) => {
+export const CompanySettings = () => {
   const { toast } = useToast();
+  const { activeCompany, updateCompany } = useCompany();
+  const [formData, setFormData] = useState({
+    name: "",
+    address: "",
+    npa: "",
+    city: "",
+    phone: "",
+    email: "",
+    iban: "",
+    tva_number: ""
+  });
 
-  const handleInputChange = (field: keyof CompanyInfo, value: string) => {
-    onCompanyInfoChange({
-      ...companyInfo,
+  // Sync form data with active company
+  useEffect(() => {
+    if (activeCompany) {
+      setFormData({
+        name: activeCompany.name || "",
+        address: activeCompany.address || "",
+        npa: activeCompany.npa || "",
+        city: activeCompany.city || "",
+        phone: activeCompany.phone || "",
+        email: activeCompany.email || "",
+        iban: activeCompany.iban || "",
+        tva_number: activeCompany.tva_number || ""
+      });
+    }
+  }, [activeCompany]);
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
       [field]: value
-    });
+    }));
   };
 
-  const handleSave = () => {
-    if (!companyInfo.name || !companyInfo.iban) {
+  const handleSave = async () => {
+    if (!activeCompany) {
+      toast({
+        title: "Erreur",
+        description: "Aucune entreprise sélectionnée",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.name || !formData.iban) {
       toast({
         title: "Informations incomplètes",
         description: "Veuillez au minimum renseigner le nom de l'entreprise et l'IBAN.",
@@ -31,16 +63,33 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
       return;
     }
 
-    toast({
-      title: "Paramètres sauvegardés !",
-      description: "Les informations de votre entreprise ont été mises à jour."
-    });
+    try {
+      await updateCompany(activeCompany.id, formData);
+    } catch (error) {
+      console.error('Error updating company:', error);
+    }
   };
 
   const validateIBAN = (iban: string) => {
     const cleaned = iban.replace(/\s/g, '');
     return cleaned.length >= 15 && cleaned.startsWith('CH');
   };
+
+  if (!activeCompany) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center py-8">
+            <Building className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">Aucune entreprise sélectionnée</h3>
+            <p className="text-muted-foreground">
+              Créez ou sélectionnez une entreprise pour modifier ses informations
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -51,7 +100,7 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
             Informations de l'entreprise
           </CardTitle>
           <CardDescription>
-            Ces informations apparaîtront sur vos factures et dans le QR-bill
+            Entreprise active: <strong>{activeCompany.name}</strong> - Ces informations apparaîtront sur vos factures et dans le QR-bill
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -60,7 +109,7 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
               <Label htmlFor="companyName">Nom de l'entreprise *</Label>
               <Input
                 id="companyName"
-                value={companyInfo.name}
+                value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="Mon Entreprise SA"
               />
@@ -69,7 +118,7 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
               <Label htmlFor="companyAddress">Adresse *</Label>
               <Input
                 id="companyAddress"
-                value={companyInfo.address}
+                value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
                 placeholder="Rue de la Paix 123"
               />
@@ -78,7 +127,7 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
               <Label htmlFor="companyNPA">NPA *</Label>
               <Input
                 id="companyNPA"
-                value={companyInfo.npa}
+                value={formData.npa}
                 onChange={(e) => handleInputChange('npa', e.target.value)}
                 placeholder="1000"
               />
@@ -87,7 +136,7 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
               <Label htmlFor="companyCity">Ville *</Label>
               <Input
                 id="companyCity"
-                value={companyInfo.city}
+                value={formData.city}
                 onChange={(e) => handleInputChange('city', e.target.value)}
                 placeholder="Lausanne"
               />
@@ -96,7 +145,7 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
               <Label htmlFor="companyPhone">Téléphone</Label>
               <Input
                 id="companyPhone"
-                value={companyInfo.phone}
+                value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 placeholder="+41 21 123 45 67"
               />
@@ -106,7 +155,7 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
               <Input
                 id="companyEmail"
                 type="email"
-                value={companyInfo.email}
+                value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 placeholder="contact@monentreprise.ch"
               />
@@ -117,12 +166,12 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
             <Label htmlFor="companyIBAN">IBAN Suisse *</Label>
             <Input
               id="companyIBAN"
-              value={companyInfo.iban}
+              value={formData.iban}
               onChange={(e) => handleInputChange('iban', e.target.value)}
               placeholder="CH93 0076 2011 6238 5295 7"
-              className={!validateIBAN(companyInfo.iban) && companyInfo.iban ? 'border-destructive' : ''}
+              className={!validateIBAN(formData.iban) && formData.iban ? 'border-destructive' : ''}
             />
-            {!validateIBAN(companyInfo.iban) && companyInfo.iban && (
+            {!validateIBAN(formData.iban) && formData.iban && (
               <p className="text-sm text-destructive">Format IBAN invalide (doit commencer par CH)</p>
             )}
           </div>
@@ -131,8 +180,8 @@ export const CompanySettings = ({ companyInfo, onCompanyInfoChange }: CompanySet
             <Label htmlFor="companyTVA">Numéro TVA (optionnel)</Label>
             <Input
               id="companyTVA"
-              value={companyInfo.tvaNumber}
-              onChange={(e) => handleInputChange('tvaNumber', e.target.value)}
+              value={formData.tva_number}
+              onChange={(e) => handleInputChange('tva_number', e.target.value)}
               placeholder="CHE-123.456.789 TVA"
             />
           </div>

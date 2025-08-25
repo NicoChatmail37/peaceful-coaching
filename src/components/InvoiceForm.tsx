@@ -7,20 +7,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2 } from "lucide-react";
-import { Invoice, InvoiceItem, CompanyInfo } from "@/pages/Index";
+import { Invoice, InvoiceItem } from "@/pages/Index";
 import { useToast } from "@/hooks/use-toast";
 import { ClientSelector } from "@/components/ClientSelector";
 import { ProductSelector } from "@/components/ProductSelector";
 import { Client } from "@/hooks/useClients";
 import { Product } from "@/hooks/useProducts";
+import { useCompany } from "@/hooks/useCompany";
 
 interface InvoiceFormProps {
   onInvoiceCreate: (invoice: Invoice) => void;
-  companyInfo: CompanyInfo;
 }
 
-export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) => {
+export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
   const { toast } = useToast();
+  const { activeCompany } = useCompany();
   const [formData, setFormData] = useState({
     clientName: "",
     clientAddress: "",
@@ -100,7 +101,7 @@ export const InvoiceForm = ({ onInvoiceCreate, companyInfo }: InvoiceFormProps) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!companyInfo.name || !companyInfo.iban) {
+    if (!activeCompany?.name || !activeCompany?.iban) {
       toast({
         title: "Informations manquantes",
         description: "Veuillez d'abord configurer les informations de votre entreprise dans les paramètres.",

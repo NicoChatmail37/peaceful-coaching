@@ -1,17 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Invoice, CompanyInfo } from "@/pages/Index";
+import { Invoice } from "@/pages/Index";
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { useCompany } from "@/hooks/useCompany";
 
 interface QRBillProps {
   invoice: Invoice;
-  companyInfo: CompanyInfo;
 }
 
-export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
+export const QRBill = ({ invoice }: QRBillProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [qrGenerated, setQrGenerated] = useState(false);
+  const { activeCompany } = useCompany();
 
   // -----------------------------
   // Helpers
@@ -57,7 +58,7 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
   // Génération du payload Swiss QR-bill
   // -----------------------------
   const generateQRData = () => {
-    const cleanIBAN = companyInfo.iban.replace(/\s/g, "").toUpperCase();
+    const cleanIBAN = activeCompany?.iban?.replace(/\s/g, "").toUpperCase() || "";
     const amount = invoice.totalWithTva > 0 ? invoice.totalWithTva.toFixed(2) : "";
 
     // Si on utilise NON (pas de référence), éviter un QR‑IBAN
@@ -69,10 +70,10 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
 
     // Creditor (bénéficiaire)
     const creditor = buildStructuredAddress(
-      companyInfo.name,
-      companyInfo.address,
-      companyInfo.npa,
-      companyInfo.city,
+      activeCompany?.name || "",
+      activeCompany?.address || "",
+      activeCompany?.npa || "",
+      activeCompany?.city || "",
       "CH"
     );
 
@@ -143,7 +144,7 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
 
     generateQR();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoice, companyInfo]);
+  }, [invoice, activeCompany]);
 
   const formatIBAN = (iban: string) => {
     return iban.replace(/(.{4})/g, "$1 ").trim();
@@ -158,10 +159,10 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
 
           <div className="text-xs space-y-1">
             <div className="font-medium">Compte / Payable à</div>
-            <div>{formatIBAN(companyInfo.iban)}</div>
-            <div>{companyInfo.name}</div>
-            <div>{companyInfo.address}</div>
-            <div>{companyInfo.npa} {companyInfo.city}</div>
+            <div>{formatIBAN(activeCompany?.iban || "")}</div>
+            <div>{activeCompany?.name}</div>
+            <div>{activeCompany?.address}</div>
+            <div>{activeCompany?.npa} {activeCompany?.city}</div>
           </div>
 
           <div className="text-xs space-y-1">
@@ -217,10 +218,10 @@ export const QRBill = ({ invoice, companyInfo }: QRBillProps) => {
 
           <div className="text-xs space-y-1">
             <div className="font-medium">Compte / Payable à</div>
-            <div>{formatIBAN(companyInfo.iban)}</div>
-            <div>{companyInfo.name}</div>
-            <div>{companyInfo.address}</div>
-            <div>{companyInfo.npa} {companyInfo.city}</div>
+            <div>{formatIBAN(activeCompany?.iban || "")}</div>
+            <div>{activeCompany?.name}</div>
+            <div>{activeCompany?.address}</div>
+            <div>{activeCompany?.npa} {activeCompany?.city}</div>
           </div>
 
           <div className="text-xs space-y-1">

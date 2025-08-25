@@ -7,7 +7,6 @@ import { CompanySettings } from "@/components/CompanySettings";
 import { CompanyManagement } from "@/components/CompanyManagement";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { useCompany } from "@/hooks/useCompany";
 import Clients from "./Clients";
 import Products from "./Products";
 
@@ -35,32 +34,11 @@ export interface InvoiceItem {
   total: number;
 }
 
-export interface CompanyInfo {
-  name: string;
-  address: string;
-  npa: string;
-  city: string;
-  phone: string;
-  email: string;
-  iban: string;
-  tvaNumber?: string;
-}
 
 const Index = () => {
-  const { activeCompany } = useCompany();
   const [currentTab, setCurrentTab] = useState("create");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
-    name: "",
-    address: "",
-    npa: "",
-    city: "",
-    phone: "",
-    email: "",
-    iban: "",
-    tvaNumber: ""
-  });
 
   const handleInvoiceCreate = (invoice: Invoice) => {
     setInvoices(prev => [...prev, invoice]);
@@ -118,15 +96,13 @@ const Index = () => {
           <TabsContent value="create" className="space-y-6">
             <InvoiceForm 
               onInvoiceCreate={handleInvoiceCreate}
-              companyInfo={companyInfo}
             />
           </TabsContent>
 
           <TabsContent value="preview" className="space-y-6">
             {selectedInvoice ? (
               <InvoicePreview 
-                invoice={selectedInvoice} 
-                companyInfo={companyInfo}
+                invoice={selectedInvoice}
               />
             ) : (
               <div className="text-center py-12">
@@ -157,10 +133,7 @@ const Index = () => {
           <TabsContent value="settings" className="space-y-6">
             <CompanyManagement />
             <Separator />
-            <CompanySettings 
-              companyInfo={companyInfo}
-              onCompanyInfoChange={setCompanyInfo}
-            />
+            <CompanySettings />
           </TabsContent>
         </Tabs>
       </main>
