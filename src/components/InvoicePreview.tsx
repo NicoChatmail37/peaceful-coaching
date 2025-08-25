@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
 import { Invoice, CompanyInfo } from "@/pages/Index";
 import { QRBill } from "@/components/QRBill";
 import { AccountingExport } from "@/components/AccountingExport";
@@ -31,7 +30,8 @@ export const InvoicePreview = ({ invoice, companyInfo }: InvoicePreviewProps) =>
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+      {/* Barre d'actions */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center print:hidden">
         <div>
           <h2 className="text-2xl font-bold">Facture {invoice.number}</h2>
           <p className="text-muted-foreground">
@@ -55,145 +55,132 @@ export const InvoicePreview = ({ invoice, companyInfo }: InvoicePreviewProps) =>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="invoice-preview">
-            <CardContent className="p-8 space-y-8">
-              {/* En-tête de facture */}
-              <div className="flex justify-between items-start">
-                <div>
-                  <h1 className="text-3xl font-bold text-primary mb-2">FACTURE</h1>
-                  <p className="text-sm text-muted-foreground">
-                    N° {invoice.number}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <h2 className="text-xl font-semibold text-foreground">
-                    {companyInfo.name}
-                  </h2>
-                  <div className="text-sm text-muted-foreground mt-2">
-                    <p>{companyInfo.address}</p>
-                    <p>{companyInfo.npa} {companyInfo.city}</p>
-                    <p>{companyInfo.phone}</p>
-                    <p>{companyInfo.email}</p>
-                    {companyInfo.tvaNumber && (
-                      <p>TVA: {companyInfo.tvaNumber}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Informations client et dates */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <h3 className="font-semibold text-foreground mb-3">Facturé à:</h3>
-                  <div className="text-sm">
-                    <p className="font-medium">{invoice.clientName}</p>
-                    <p>{invoice.clientAddress}</p>
-                    <p>{invoice.clientNPA} {invoice.clientCity}</p>
-                  </div>
-                </div>
-                <div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Date de facture:</span>
-                      <span>{new Date(invoice.date).toLocaleDateString('fr-CH')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Échéance:</span>
-                      <span>{new Date(invoice.dueDate).toLocaleDateString('fr-CH')}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Articles */}
-              <div>
-                <h3 className="font-semibold text-foreground mb-4">Détail des prestations:</h3>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-4 gap-4 text-sm font-medium text-muted-foreground border-b pb-2">
-                    <div className="col-span-2">Description</div>
-                    <div className="text-center">Qté</div>
-                    <div className="text-right">Prix unit.</div>
-                    <div className="text-right">Total</div>
-                  </div>
-                  
-                  {invoice.items.map((item, index) => (
-                    <div key={index} className="grid grid-cols-5 gap-4 text-sm py-2">
-                      <div className="col-span-2">{item.description}</div>
-                      <div className="text-center">{item.quantity}</div>
-                      <div className="text-right">CHF {item.price.toFixed(2)}</div>
-                      <div className="text-right font-medium">CHF {item.total.toFixed(2)}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Totaux */}
-              <div className="flex justify-end">
-                <div className="w-64 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Sous-total:</span>
-                    <span>CHF {invoice.total.toFixed(2)}</span>
-                  </div>
-                  {invoice.tva > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span>TVA 7.7%:</span>
-                      <span>CHF {invoice.tva.toFixed(2)}</span>
-                    </div>
+      {/* Layout A4 officiel suisse */}
+      <div className="max-w-none">
+        {/* Page principale de facture */}
+        <Card className="invoice-preview max-w-[210mm] mx-auto bg-white shadow-lg print:shadow-none print:border-none">
+          <CardContent className="p-12 space-y-8" style={{ minHeight: '297mm' }}>
+            {/* En-tête avec informations entreprise et client */}
+            <div className="flex justify-between items-start mb-16">
+              {/* Informations entreprise */}
+              <div className="space-y-1">
+                <h2 className="text-xl font-bold text-foreground uppercase">
+                  {companyInfo.name}
+                </h2>
+                <div className="text-sm text-muted-foreground">
+                  <p>{companyInfo.address}</p>
+                  <p>{companyInfo.npa} {companyInfo.city}</p>
+                  <p>Tél: {companyInfo.phone}</p>
+                  <p>{companyInfo.email}</p>
+                  {companyInfo.tvaNumber && (
+                    <p>N° TVA: {companyInfo.tvaNumber}</p>
                   )}
-                  <Separator />
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total:</span>
-                    <span>CHF {invoice.totalWithTva.toFixed(2)}</span>
-                  </div>
                 </div>
               </div>
 
-              {/* Remarques */}
-              {invoice.notes && (
-                <>
-                  <Separator />
-                  <div>
-                    <h3 className="font-semibold text-foreground mb-2">Remarques:</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {invoice.notes}
-                    </p>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+              {/* Adresse client et informations facture */}
+              <div className="text-right space-y-6">
+                <div>
+                  <p className="text-sm font-medium">Monsieur</p>
+                  <p className="text-sm font-medium">{invoice.clientName}</p>
+                  <p className="text-sm">{invoice.clientAddress}</p>
+                  <p className="text-sm">{invoice.clientNPA} {invoice.clientCity}</p>
+                </div>
+                
+                <div className="text-sm space-y-1">
+                  <p>N° d'affilié/IDE: <span className="font-medium">{invoice.number}</span></p>
+                  <p>N° AVS: 756.4750.1669.33</p>
+                  <p>{companyInfo.city}, le {new Date(invoice.date).toLocaleDateString('fr-CH')}</p>
+                </div>
+              </div>
+            </div>
 
-          {/* QR-Bill */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                📱 QR-Facture Suisse
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+            {/* Titre et référence */}
+            <div className="mb-8">
+              <h1 className="text-lg font-bold mb-2">{new Date().getFullYear()}54{String(new Date().getMonth() + 1).padStart(2, '0')}000 Décompte de cotisations 1er trimestre {new Date().getFullYear()}</h1>
+              <p className="text-sm text-muted-foreground">36096-1200</p>
+            </div>
+
+            {/* Tableau des prestations */}
+            <div className="mb-16">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-gray-300">
+                    <th className="text-left py-3 px-2 text-xs font-medium">LIBELLÉ</th>
+                    <th className="text-center py-3 px-2 text-xs font-medium">PÉRIODE</th>
+                    <th className="text-right py-3 px-2 text-xs font-medium">BASE OU<br/>MONTANT DU</th>
+                    <th className="text-right py-3 px-2 text-xs font-medium">DÉJÀ FACTURÉ</th>
+                    <th className="text-right py-3 px-2 text-xs font-medium">BASE</th>
+                    <th className="text-right py-3 px-2 text-xs font-medium">TAUX</th>
+                    <th className="text-right py-3 px-2 text-xs font-medium">MONTANT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.items.map((item, index) => (
+                    <tr key={index} className="border-b border-gray-200">
+                      <td className="py-2 px-2 text-xs">{item.description}</td>
+                      <td className="py-2 px-2 text-xs text-center">{new Date(invoice.date).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                      <td className="py-2 px-2 text-xs text-right">{item.price.toFixed(2)}</td>
+                      <td className="py-2 px-2 text-xs text-right">-</td>
+                      <td className="py-2 px-2 text-xs text-right">{item.price.toFixed(2)}</td>
+                      <td className="py-2 px-2 text-xs text-right">{item.quantity.toFixed(2)}</td>
+                      <td className="py-2 px-2 text-xs text-right font-medium">{item.total.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Total en notre faveur */}
+            <div className="mb-16 flex justify-end">
+              <div className="text-right">
+                <div className="border-2 border-gray-800 p-4 min-w-96">
+                  <p className="text-sm font-bold mb-2">
+                    TOTAL EN NOTRE FAVEUR / DOIT ÊTRE EN NOTRE POSSESSION LE {new Date(invoice.dueDate).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }).toUpperCase()}
+                  </p>
+                  <p className="text-2xl font-bold">{invoice.totalWithTva.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ligne de séparation pour la section QR */}
+            <div className="border-t border-dashed border-gray-400 pt-8 mt-auto">
+              {/* QR-Bill en bas de page dans sa position officielle */}
               <QRBill invoice={invoice} companyInfo={companyInfo} />
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Panneau latéral - Export comptabilité */}
-        <div className="space-y-6">
+        {/* Panneau latéral - Export comptabilité (affiché uniquement à l'écran) */}
+        <div className="mt-6 print:hidden">
           <AccountingExport invoice={invoice} />
         </div>
       </div>
 
       <style>{`
         @media print {
+          body {
+            margin: 0;
+            padding: 0;
+          }
           .invoice-preview {
             box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            max-width: none !important;
+            width: 100% !important;
+          }
+          @page {
+            size: A4;
+            margin: 15mm;
+          }
+          .print\\:hidden {
+            display: none !important;
+          }
+          .print\\:shadow-none {
+            box-shadow: none !important;
+          }
+          .print\\:border-none {
             border: none !important;
           }
         }
