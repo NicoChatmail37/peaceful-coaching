@@ -83,18 +83,81 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
 
   const handleSendEmail = async () => {
     try {
-      // First generate PDF (this will also update status to 'sent')
-      await handleExportPDF();
+      // Generate PDF first
+      const element = document.querySelector('.invoice-preview') as HTMLElement;
+      if (!element || !activeCompany) {
+        throw new Error('Éléments requis non trouvés');
+      }
+
+      // Temporarily hide the print:hidden elements
+      const hiddenElements = document.querySelectorAll('.print\\:hidden');
+      hiddenElements.forEach(el => (el as HTMLElement).style.display = 'none');
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+
+      // Restore hidden elements
+      hiddenElements.forEach(el => (el as HTMLElement).style.display = '');
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
       
-      // Here you could add email sending functionality
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      // If content is too tall, fit to page height
+      if (imgHeight > pdfHeight) {
+        const ratio = pdfHeight / imgHeight;
+        const finalWidth = imgWidth * ratio;
+        const finalHeight = pdfHeight;
+        pdf.addImage(imgData, 'PNG', (pdfWidth - finalWidth) / 2, 0, finalWidth, finalHeight);
+      } else {
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      }
+
+      // Get PDF as blob
+      const pdfBlob = pdf.output('blob');
+      const pdfFile = new File([pdfBlob], `facture-${invoice.number}.pdf`, { type: 'application/pdf' });
+
+      // Create email template
+      const emailTemplate = activeCompany.email_template || "Bonjour,\n\nVeuillez trouver ci-joint votre facture.\n\nCordialement,\n{company_name}";
+      const emailBody = emailTemplate.replace('{company_name}', activeCompany.name);
+
+      // Create mailto link with attachment (note: attachments don't work in mailto)
+      const subject = `Facture ${invoice.number} - ${activeCompany.name}`;
+      const mailtoLink = `mailto:${invoice.clientName ? '' : ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+
+      // Open email client
+      window.open(mailtoLink);
+
+      // Since we can't attach files to mailto, we'll provide download
+      const downloadLink = document.createElement('a');
+      downloadLink.href = URL.createObjectURL(pdfFile);
+      downloadLink.download = `facture-${invoice.number}.pdf`;
+      downloadLink.click();
+      URL.revokeObjectURL(downloadLink.href);
+
+      // Update status to sent if it was draft
+      if (invoice.status === 'draft') {
+        await updateInvoiceStatus(invoice.id, 'sent');
+        onInvoiceStatusUpdate?.(invoice, 'sent');
+      }
+
       toast({
-        title: "Prêt à envoyer",
-        description: "Le PDF a été généré. Fonctionnalité d'envoi email à venir.",
+        title: "Email préparé",
+        description: "L'email s'ouvre dans votre client mail. Le PDF a été téléchargé séparément à joindre manuellement.",
       });
     } catch (error) {
+      console.error('Error preparing email:', error);
       toast({
         title: "Erreur",
-        description: "Erreur lors de la préparation de l'envoi.",
+        description: "Erreur lors de la préparation de l'email.",
         variant: "destructive"
       });
     }

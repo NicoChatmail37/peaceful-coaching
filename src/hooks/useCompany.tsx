@@ -16,6 +16,7 @@ export interface Company {
   tva_number?: string;
   logo_url?: string;
   theme_color: string;
+  email_template?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

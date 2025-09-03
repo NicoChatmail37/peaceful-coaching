@@ -2,9 +2,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/hooks/useCompany";
-import { Building, Save } from "lucide-react";
+import { Building, Save, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export const CompanySettings = () => {
@@ -18,7 +19,8 @@ export const CompanySettings = () => {
     phone: "",
     email: "",
     iban: "",
-    tva_number: ""
+    tva_number: "",
+    email_template: ""
   });
 
   // Sync form data with active company
@@ -32,7 +34,8 @@ export const CompanySettings = () => {
         phone: activeCompany.phone || "",
         email: activeCompany.email || "",
         iban: activeCompany.iban || "",
-        tva_number: activeCompany.tva_number || ""
+        tva_number: activeCompany.tva_number || "",
+        email_template: activeCompany.email_template || "Bonjour,\n\nVeuillez trouver ci-joint votre facture.\n\nCordialement,\n{company_name}"
       });
     }
   }, [activeCompany]);
@@ -190,6 +193,41 @@ export const CompanySettings = () => {
             <Button onClick={handleSave} className="bg-gradient-primary hover:bg-primary/90">
               <Save className="w-4 h-4 mr-2" />
               Sauvegarder les paramètres
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Modèle d'email pour les factures
+          </CardTitle>
+          <CardDescription>
+            Texte qui accompagnera vos factures lors de l'envoi par email. Utilisez {'{company_name}'} pour insérer le nom de votre entreprise.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="emailTemplate">Texte du message</Label>
+            <Textarea
+              id="emailTemplate"
+              value={formData.email_template}
+              onChange={(e) => handleInputChange('email_template', e.target.value)}
+              placeholder="Bonjour,\n\nVeuillez trouver ci-joint votre facture.\n\nCordialement,\n{company_name}"
+              rows={6}
+              className="min-h-32"
+            />
+            <p className="text-sm text-muted-foreground">
+              Ce texte sera utilisé comme contenu de l'email lors de l'envoi des factures.
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={handleSave} className="bg-gradient-primary hover:bg-primary/90">
+              <Save className="w-4 h-4 mr-2" />
+              Sauvegarder le modèle
             </Button>
           </div>
         </CardContent>
