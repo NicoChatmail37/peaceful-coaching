@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import Clients from "./Clients";
 import Products from "./Products";
+import { useInvoices } from "@/hooks/useInvoices";
 
 export interface Invoice {
   id: string;
@@ -39,6 +40,7 @@ const Index = () => {
   const [currentTab, setCurrentTab] = useState("create");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const { invoices: supabaseInvoices } = useInvoices();
 
   const handleInvoiceCreate = (invoice: Invoice) => {
     setInvoices(prev => [...prev, invoice]);
@@ -103,6 +105,9 @@ const Index = () => {
             {selectedInvoice ? (
               <InvoicePreview 
                 invoice={selectedInvoice}
+                onInvoiceStatusUpdate={(invoice, status) => {
+                  setSelectedInvoice({ ...invoice, status });
+                }}
               />
             ) : (
               <div className="text-center py-12">

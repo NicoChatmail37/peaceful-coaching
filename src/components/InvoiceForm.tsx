@@ -14,6 +14,7 @@ import { ProductSelector } from "@/components/ProductSelector";
 import { Client } from "@/hooks/useClients";
 import { Product } from "@/hooks/useProducts";
 import { useCompany } from "@/hooks/useCompany";
+import { useInvoices, FullInvoice } from "@/hooks/useInvoices";
 
 interface InvoiceFormProps {
   onInvoiceCreate: (invoice: Invoice) => void;
@@ -22,6 +23,7 @@ interface InvoiceFormProps {
 export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
   const { toast } = useToast();
   const { activeCompany } = useCompany();
+  const { saveInvoice } = useInvoices();
   const [formData, setFormData] = useState({
     clientName: "",
     clientAddress: "",
@@ -98,7 +100,7 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
     return { subtotal, tva, totalWithTva };
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!activeCompany?.name || !activeCompany?.iban) {
@@ -124,42 +126,66 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const invoice: Invoice = {
-      id: Date.now().toString(),
+    // Create invoice for Supabase
+    const supabaseInvoice: FullInvoice = {
       number: invoiceNumber,
       date: today,
-      dueDate,
+      due_date: dueDate,
+      subtotal: subtotal,
+      tva_rate: formData.includeTva ? 7.7 : 0,
+      tva_amount: formData.includeTva ? tva : 0,
+      total: formData.includeTva ? totalWithTva : subtotal,
+      notes: formData.notes,
+      status: 'draft',
       clientName: formData.clientName,
       clientAddress: formData.clientAddress,
       clientNPA: formData.clientNPA,
       clientCity: formData.clientCity,
-      items: items.filter(item => item.description && item.price > 0),
-      total: subtotal,
-      tva: formData.includeTva ? tva : 0,
-      totalWithTva: formData.includeTva ? totalWithTva : subtotal,
-      notes: formData.notes,
-      status: 'draft'
+      items: items.filter(item => item.description && item.price > 0).map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total: item.total
+      }))
     };
 
-    onInvoiceCreate(invoice);
+    // Save to Supabase
+    const savedInvoiceId = await saveInvoice(supabaseInvoice);
     
-    toast({
-      title: "Facture créée !",
-      description: `Facture ${invoiceNumber} créée avec succès.`
-    });
+    if (savedInvoiceId) {
+      // Create invoice for local state (backward compatibility)
+      const invoice: Invoice = {
+        id: savedInvoiceId,
+        number: invoiceNumber,
+        date: today,
+        dueDate,
+        clientName: formData.clientName,
+        clientAddress: formData.clientAddress,
+        clientNPA: formData.clientNPA,
+        clientCity: formData.clientCity,
+        items: items.filter(item => item.description && item.price > 0),
+        total: subtotal,
+        tva: formData.includeTva ? tva : 0,
+        totalWithTva: formData.includeTva ? totalWithTva : subtotal,
+        notes: formData.notes,
+        status: 'draft'
+      };
 
-    // Reset form
-    setFormData({
-      clientName: "",
-      clientAddress: "",
-      clientNPA: "",
-      clientCity: "",
-      notes: "",
-      includeTva: false
-    });
-    setItems([{ description: "", quantity: 1, price: 0, total: 0 }]);
-    setSelectedClient(null);
-    setSelectedProducts([null]);
+      onInvoiceCreate(invoice);
+
+      // Reset form
+      setFormData({
+        clientName: "",
+        clientAddress: "",
+        clientNPA: "",
+        clientCity: "",
+        notes: "",
+        includeTva: false
+      });
+      setItems([{ description: "", quantity: 1, price: 0, total: 0 }]);
+      setSelectedClient(null);
+      setSelectedProducts([null]);
+    }
   };
 
   const { subtotal, tva, totalWithTva } = calculateTotals();

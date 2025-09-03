@@ -6,27 +6,98 @@ import { AccountingExport } from "@/components/AccountingExport";
 import { Download, Send, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/hooks/useCompany";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { useInvoices, FullInvoice } from "@/hooks/useInvoices";
 
 interface InvoicePreviewProps {
   invoice: Invoice;
+  onInvoiceStatusUpdate?: (invoice: Invoice, status: 'draft' | 'sent' | 'paid') => void;
 }
 
-export const InvoicePreview = ({ invoice }: InvoicePreviewProps) => {
+export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePreviewProps) => {
   const { toast } = useToast();
   const { activeCompany } = useCompany();
+  const { updateInvoiceStatus } = useInvoices();
 
-  const handleExportPDF = () => {
-    toast({
-      title: "Export PDF",
-      description: "Fonctionnalité d'export PDF à venir. Utilisez l'impression du navigateur pour l'instant.",
-    });
+  const handleExportPDF = async () => {
+    try {
+      const element = document.querySelector('.invoice-preview') as HTMLElement;
+      if (!element) {
+        throw new Error('Invoice element not found');
+      }
+
+      // Temporarily hide the print:hidden elements
+      const hiddenElements = document.querySelectorAll('.print\\:hidden');
+      hiddenElements.forEach(el => (el as HTMLElement).style.display = 'none');
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+
+      // Restore hidden elements
+      hiddenElements.forEach(el => (el as HTMLElement).style.display = '');
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      // If content is too tall, fit to page height
+      if (imgHeight > pdfHeight) {
+        const ratio = pdfHeight / imgHeight;
+        const finalWidth = imgWidth * ratio;
+        const finalHeight = pdfHeight;
+        pdf.addImage(imgData, 'PNG', (pdfWidth - finalWidth) / 2, 0, finalWidth, finalHeight);
+      } else {
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      }
+
+      pdf.save(`facture-${invoice.number}.pdf`);
+      
+      // Update status to sent if it was draft
+      if (invoice.status === 'draft') {
+        await updateInvoiceStatus(invoice.id, 'sent');
+        onInvoiceStatusUpdate?.(invoice, 'sent');
+      }
+
+      toast({
+        title: "PDF généré",
+        description: `La facture ${invoice.number} a été exportée en PDF.`,
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la génération du PDF. Utilisez l'impression du navigateur.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleSendEmail = () => {
-    toast({
-      title: "Envoi par email",
-      description: "Fonctionnalité d'envoi par email à venir.",
-    });
+  const handleSendEmail = async () => {
+    try {
+      // First generate PDF (this will also update status to 'sent')
+      await handleExportPDF();
+      
+      // Here you could add email sending functionality
+      toast({
+        title: "Prêt à envoyer",
+        description: "Le PDF a été généré. Fonctionnalité d'envoi email à venir.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la préparation de l'envoi.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

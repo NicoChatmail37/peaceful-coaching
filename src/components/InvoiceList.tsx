@@ -3,13 +3,59 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Invoice } from "@/pages/Index";
 import { Eye, FileText, CheckCircle, Clock } from "lucide-react";
+import { useInvoices, FullInvoice } from "@/hooks/useInvoices";
 
 interface InvoiceListProps {
   invoices: Invoice[];
   onInvoiceSelect: (invoice: Invoice) => void;
 }
 
+// Utility function to convert Supabase invoice to local Invoice format
+const convertSupabaseToLocal = (supabaseInvoice: FullInvoice): Invoice => {
+  return {
+    id: supabaseInvoice.id || '',
+    number: supabaseInvoice.number,
+    date: supabaseInvoice.date,
+    dueDate: supabaseInvoice.due_date,
+    clientName: supabaseInvoice.clientName,
+    clientAddress: supabaseInvoice.clientAddress,
+    clientNPA: supabaseInvoice.clientNPA,
+    clientCity: supabaseInvoice.clientCity,
+    items: supabaseInvoice.items.map(item => ({
+      description: item.description,
+      quantity: item.quantity,
+      price: item.unit_price,
+      total: item.total
+    })),
+    total: supabaseInvoice.subtotal,
+    tva: supabaseInvoice.tva_amount,
+    totalWithTva: supabaseInvoice.total,
+    notes: supabaseInvoice.notes,
+    status: supabaseInvoice.status
+  };
+};
+
 export const InvoiceList = ({ invoices, onInvoiceSelect }: InvoiceListProps) => {
+  const { invoices: supabaseInvoices, loading } = useInvoices();
+
+  // Use Supabase invoices if available, fallback to local invoices
+  const displayInvoices = supabaseInvoices.length > 0 
+    ? supabaseInvoices.map(convertSupabaseToLocal)
+    : invoices;
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <div className="text-6xl mb-4">⏳</div>
+          <h3 className="text-xl font-semibold mb-2">Chargement...</h3>
+          <p className="text-muted-foreground">
+            Chargement des factures en cours...
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
   const getStatusColor = (status: Invoice['status']) => {
     switch (status) {
       case 'draft':
@@ -49,7 +95,7 @@ export const InvoiceList = ({ invoices, onInvoiceSelect }: InvoiceListProps) => 
     }
   };
 
-  if (invoices.length === 0) {
+  if (displayInvoices.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
@@ -63,9 +109,9 @@ export const InvoiceList = ({ invoices, onInvoiceSelect }: InvoiceListProps) => 
     );
   }
 
-  const totalAmount = invoices.reduce((sum, invoice) => sum + invoice.totalWithTva, 0);
-  const paidInvoices = invoices.filter(inv => inv.status === 'paid');
-  const pendingInvoices = invoices.filter(inv => inv.status !== 'paid');
+  const totalAmount = displayInvoices.reduce((sum, invoice) => sum + invoice.totalWithTva, 0);
+  const paidInvoices = displayInvoices.filter(inv => inv.status === 'paid');
+  const pendingInvoices = displayInvoices.filter(inv => inv.status !== 'paid');
 
   return (
     <div className="space-y-6">
@@ -73,7 +119,7 @@ export const InvoiceList = ({ invoices, onInvoiceSelect }: InvoiceListProps) => 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{invoices.length}</div>
+            <div className="text-2xl font-bold text-primary">{displayInvoices.length}</div>
             <div className="text-sm text-muted-foreground">Total factures</div>
           </CardContent>
         </Card>
@@ -109,7 +155,7 @@ export const InvoiceList = ({ invoices, onInvoiceSelect }: InvoiceListProps) => 
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {invoices.map((invoice) => (
+            {displayInvoices.map((invoice) => (
               <div
                 key={invoice.id}
                 className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
