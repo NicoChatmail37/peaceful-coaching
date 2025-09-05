@@ -157,96 +157,111 @@ export const QRBill = ({ invoice }: QRBillProps) => {
   const formatIBAN = (iban: string) => iban.replace(/(.{4})/g, "$1 ").trim();
 
   return (
-    <div className="border-2 border-dashed border-muted-foreground/20 p-6 bg-muted/10">
-      {/* Grille 3 colonnes (recépissé | paiement | QR) */}
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr_auto] gap-6">
-        {/* 1) Récépissé */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold">Section de réception</h3>
-
-          <div className="text-xs space-y-1">
-            <div className="font-medium">Compte / Payable à</div>
-            <div>{formatIBAN(activeCompany?.iban || "")}</div>
-            <div>{activeCompany?.name}</div>
-            <div>{activeCompany?.address}</div>
-            <div>{activeCompany?.npa} {activeCompany?.city}</div>
+    <div className="bg-white" style={{ width: '210mm', minHeight: '105mm' }}>
+      {/* Layout QR-bill suisse standard */}
+      <div className="flex" style={{ height: '105mm' }}>
+        
+        {/* Section Récépissé (gauche) - 62mm de largeur */}
+        <div className="border-r border-black border-dashed flex flex-col" style={{ width: '62mm', padding: '5mm' }}>
+          <div className="text-xs font-bold mb-2">Récépissé</div>
+          
+          <div className="text-[8px] mb-3">
+            <div className="font-medium mb-1">Compte / Payable à</div>
+            <div className="leading-tight">
+              <div>{formatIBAN(activeCompany?.iban || "")}</div>
+              <div>{activeCompany?.name}</div>
+              <div>{activeCompany?.address}</div>
+              <div>{activeCompany?.npa} {activeCompany?.city}</div>
+            </div>
           </div>
 
-          <div className="text-xs space-y-1">
-            <div className="font-medium">Payable par</div>
-            <div>{invoice.clientName}</div>
-            <div>{invoice.clientAddress}</div>
-            <div>{invoice.clientNPA} {invoice.clientCity}</div>
+          {/* Espace pour écriture manuelle */}
+          <div className="text-[8px] mb-3">
+            <div className="font-medium mb-1">Payable par (nom/adresse)</div>
+            <div className="border-b border-gray-300 h-4 mb-1"></div>
+            <div className="border-b border-gray-300 h-4 mb-1"></div>
+            <div className="border-b border-gray-300 h-4 mb-1"></div>
           </div>
 
-          <div className="flex justify-between items-end">
-            <div className="text-xs">
+          {/* Montant en bas */}
+          <div className="mt-auto flex justify-between items-end">
+            <div className="text-[8px]">
               <div className="font-medium">Monnaie</div>
               <div>CHF</div>
             </div>
             <div className="text-right">
-              <div className="text-xs font-medium">Montant</div>
-              <div className="text-lg font-bold">{invoice.totalWithTva.toFixed(2)}</div>
+              <div className="text-[8px] font-medium">Montant</div>
+              <div className="text-sm font-bold">{invoice.totalWithTva.toFixed(2)}</div>
             </div>
           </div>
+
+          {/* Point de dépôt en bas à droite */}
+          <div className="text-[6px] text-right mt-2">Point de dépôt</div>
         </div>
 
-        {/* 2) Section paiement */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold">Section de paiement</h3>
+        {/* Section paiement (milieu) - 100mm de largeur */}
+        <div className="flex-1 flex" style={{ width: '100mm' }}>
+          
+          {/* Informations de paiement */}
+          <div className="flex-1" style={{ padding: '5mm' }}>
+            <div className="text-xs font-bold mb-4">Section paiement</div>
 
-          <div className="text-xs space-y-1">
-            <div className="font-medium">Compte / Payable à</div>
-            <div>{formatIBAN(activeCompany?.iban || "")}</div>
-            <div>{activeCompany?.name}</div>
-            <div>{activeCompany?.address}</div>
-            <div>{activeCompany?.npa} {activeCompany?.city}</div>
-          </div>
-
-          <div className="text-xs space-y-1">
-            <div className="font-medium">Informations supplémentaires</div>
-            <div>{invoice.notes || `Facture ${invoice.number}`}</div>
-          </div>
-
-          <div className="text-xs space-y-1">
-            <div className="font-medium">Payable par</div>
-            <div>{invoice.clientName}</div>
-            <div>{invoice.clientAddress}</div>
-            <div>{invoice.clientNPA} {invoice.clientCity}</div>
-          </div>
-
-          <div className="flex justify-between items-end">
-            <div className="text-xs">
-              <div className="font-medium">Monnaie</div>
-              <div>CHF</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs font-medium">Montant</div>
-              <div className="text-lg font-bold">{invoice.totalWithTva.toFixed(2)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* 3) QR 46mm */}
-        <div className="flex flex-col items-center">
-          <h3 className="text-sm font-semibold mb-2">QR-facture</h3>
-          <div className="relative">
-            <canvas
-              ref={canvasRef}
-              className="border border-muted-foreground/20 bg-white"
-              // la taille CSS est fixée via style.width/height ci-dessus
-            />
-            {!qrGenerated && (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted/50 text-muted-foreground text-xs">
-                Génération...
+            <div className="text-[9px] mb-4">
+              <div className="font-medium mb-1">Compte / Payable à</div>
+              <div className="leading-tight">
+                <div>{formatIBAN(activeCompany?.iban || "")}</div>
+                <div>{activeCompany?.name}</div>
+                <div>{activeCompany?.address}</div>
+                <div>{activeCompany?.npa} {activeCompany?.city}</div>
               </div>
-            )}
+            </div>
+
+            <div className="text-[9px] mb-4">
+              <div className="font-medium mb-1">Informations supplémentaires</div>
+              <div>{invoice.notes || `Facture ${invoice.number}`}</div>
+            </div>
+
+            <div className="text-[9px] mb-4">
+              <div className="font-medium mb-1">Payable par (nom/adresse)</div>
+              <div className="border-b border-gray-300 h-4 mb-1"></div>
+              <div className="border-b border-gray-300 h-4 mb-1"></div>
+              <div className="border-b border-gray-300 h-4 mb-1"></div>
+              <div className="border-b border-gray-300 h-4 mb-1"></div>
+            </div>
+
+            {/* Montant en bas */}
+            <div className="mt-auto flex justify-between items-end">
+              <div className="text-[9px]">
+                <div className="font-medium">Monnaie</div>
+                <div>CHF</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[9px] font-medium">Montant</div>
+                <div className="text-lg font-bold">{invoice.totalWithTva.toFixed(2)}</div>
+              </div>
+            </div>
           </div>
-          <div className="text-[10px] mt-2 text-center">Code QR suisse (46 mm)</div>
+
+          {/* QR Code (droite) - 46mm exactement */}
+          <div className="flex flex-col items-center justify-start" style={{ width: '46mm', padding: '5mm 5mm 5mm 0' }}>
+            <div className="relative">
+              <canvas
+                ref={canvasRef}
+                className="bg-white"
+                // la taille CSS est fixée via style.width/height dans useEffect
+              />
+              {!qrGenerated && (
+                <div className="absolute inset-0 flex items-center justify-center bg-muted/50 text-muted-foreground text-xs">
+                  Génération...
+                </div>
+              )}
+            </div>
+            <div className="text-[6px] mt-1 text-center">Code QR suisse (46 mm)</div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 text-xs text-muted-foreground text-center">
+      <div className="mt-2 text-xs text-muted-foreground text-center">
         ✅ QR-code Swiss QR-bill généré (structure conforme). Scanne d'abord sans impression pour valider.
       </div>
     </div>
