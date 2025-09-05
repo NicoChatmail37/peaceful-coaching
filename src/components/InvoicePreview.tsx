@@ -195,37 +195,36 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
         {/* Page principale de facture */}
         <Card className="invoice-preview max-w-[210mm] mx-auto bg-white shadow-lg print:shadow-none print:border-none">
           <CardContent className="p-12 space-y-8" style={{ minHeight: '297mm' }}>
-           {/* En-tête avec informations entreprise et client */}
-            <div className="mb-16">
-              <div className="grid grid-cols-[1fr_auto] items-start">
-                {/* À gauche : tes infos */}
-                <div className="space-y-1">
-                  <h2 className="text-xl font-bold text-foreground uppercase">
-                    {activeCompany?.name}
-                  </h2>
-                  <div className="text-sm text-muted-foreground">
-                    <p>{activeCompany?.address}</p>
-                    <p>{activeCompany?.npa} {activeCompany?.city}</p>
-                    {activeCompany?.phone && <p>Tél: {activeCompany.phone}</p>}
-                    {activeCompany?.email && <p>{activeCompany.email}</p>}
-                    {activeCompany?.tva_number && <p>N° TVA: {activeCompany.tva_number}</p>}
-                  </div>
+            {/* En-tête */}
+            <div className="mb-16 grid grid-cols-2 [grid-template-rows:auto_auto_auto] gap-x-4">
+              {/* Ligne 1 / Col 1 : Émetteur */}
+              <div className="col-start-1 row-start-1 space-y-1">
+                <h2 className="text-xl font-bold text-foreground uppercase">
+                  {activeCompany?.name}
+                </h2>
+                <div className="text-sm text-muted-foreground">
+                  <p>{activeCompany?.address}</p>
+                  <p>{activeCompany?.npa} {activeCompany?.city}</p>
+                  {activeCompany?.phone && <p>Tél: {activeCompany.phone}</p>}
+                  {activeCompany?.email && <p>{activeCompany.email}</p>}
+                  {activeCompany?.tva_number && <p>N° TVA: {activeCompany.tva_number}</p>}
                 </div>
-            
-                {/* À droite : destinataire décalé ≈ 10 cm */}
-                <div className="pl-[10cm] print:pl-[10cm] space-y-6">
-                  <div className="text-sm">
-                    {/* adapte le civilité si besoin */}
-                    <p className="font-medium">{invoice.clientName}</p>
-                    <p>{invoice.clientAddress}</p>
-                    <p>{invoice.clientNPA} {invoice.clientCity}</p>
-                  </div>
-            
-                  <div className="text-sm space-y-1">
-                    <p>N° de facture : <span className="font-medium">{invoice.number}</span></p>
-                    <p>{activeCompany?.city}, le {new Date(invoice.date).toLocaleDateString('fr-CH')}</p>
-                  </div>
-                </div>
+              </div>
+
+              {/* (Optionnel) Ligne 1 / Col 2 : rien → forcer le "sous" */}
+              <div className="col-start-2 row-start-1" />
+
+              {/* Ligne 2 / Col 2 : Destinataire (à droite et sous l'émetteur) */}
+              <div className="col-start-2 row-start-2 justify-self-end text-right text-sm">
+                <p className="font-medium">{invoice.clientName}</p>
+                <p>{invoice.clientAddress}</p>
+                <p>{invoice.clientNPA} {invoice.clientCity}</p>
+              </div>
+
+              {/* Ligne 3 / Col 2 : méta facture (à droite, sous le destinataire) */}
+              <div className="col-start-2 row-start-3 justify-self-end text-right text-sm mt-4 space-y-1">
+                <p>N° de facture : <span className="font-medium">{invoice.number}</span></p>
+                <p>{activeCompany?.city}, le {new Date(invoice.date).toLocaleDateString('fr-CH')}</p>
               </div>
             </div>
 
