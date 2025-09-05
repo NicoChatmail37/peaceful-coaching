@@ -195,37 +195,36 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
         {/* Page principale de facture */}
         <Card className="invoice-preview max-w-[210mm] mx-auto bg-white shadow-lg print:shadow-none print:border-none">
           <CardContent className="p-12 space-y-8" style={{ minHeight: '297mm' }}>
-            {/* En-tête avec informations entreprise et client */}
-            <div className="flex justify-between items-start mb-16">
-              {/* Informations entreprise */}
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold text-foreground uppercase">
-                  {activeCompany?.name}
-                </h2>
-                <div className="text-sm text-muted-foreground">
-                  <p>{activeCompany?.address}</p>
-                  <p>{activeCompany?.npa} {activeCompany?.city}</p>
-                  <p>Tél: {activeCompany?.phone}</p>
-                  <p>{activeCompany?.email}</p>
-                  {activeCompany?.tva_number && (
-                    <p>N° TVA: {activeCompany?.tva_number}</p>
-                  )}
+           {/* En-tête avec informations entreprise et client */}
+            <div className="mb-16">
+              <div className="grid grid-cols-[1fr_auto] items-start">
+                {/* À gauche : tes infos */}
+                <div className="space-y-1">
+                  <h2 className="text-xl font-bold text-foreground uppercase">
+                    {activeCompany?.name}
+                  </h2>
+                  <div className="text-sm text-muted-foreground">
+                    <p>{activeCompany?.address}</p>
+                    <p>{activeCompany?.npa} {activeCompany?.city}</p>
+                    {activeCompany?.phone && <p>Tél: {activeCompany.phone}</p>}
+                    {activeCompany?.email && <p>{activeCompany.email}</p>}
+                    {activeCompany?.tva_number && <p>N° TVA: {activeCompany.tva_number}</p>}
+                  </div>
                 </div>
-              </div>
-
-              {/* Adresse client et informations facture */}
-              <div className="text-right space-y-6">
-                <div>
-                  <p className="text-sm font-medium">Monsieur</p>
-                  <p className="text-sm font-medium">{invoice.clientName}</p>
-                  <p className="text-sm">{invoice.clientAddress}</p>
-                  <p className="text-sm">{invoice.clientNPA} {invoice.clientCity}</p>
-                </div>
-                
-                <div className="text-sm space-y-1">
-                  <p>N° d'affilié/IDE: <span className="font-medium">{invoice.number}</span></p>
-                  <p>N° AVS: 756.4750.1669.33</p>
-                  <p>{activeCompany?.city}, le {new Date(invoice.date).toLocaleDateString('fr-CH')}</p>
+            
+                {/* À droite : destinataire décalé ≈ 10 cm */}
+                <div className="pl-[10cm] print:pl-[10cm] space-y-6">
+                  <div className="text-sm">
+                    {/* adapte le civilité si besoin */}
+                    <p className="font-medium">{invoice.clientName}</p>
+                    <p>{invoice.clientAddress}</p>
+                    <p>{invoice.clientNPA} {invoice.clientCity}</p>
+                  </div>
+            
+                  <div className="text-sm space-y-1">
+                    <p>N° de facture : <span className="font-medium">{invoice.number}</span></p>
+                    <p>{activeCompany?.city}, le {new Date(invoice.date).toLocaleDateString('fr-CH')}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -266,17 +265,30 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
               </table>
             </div>
 
-            {/* Total en notre faveur */}
+           {/* Total à payer */}
             <div className="mb-16 flex justify-end">
               <div className="text-right">
-                <div className="border-2 border-gray-800 p-4 min-w-96">
-                  <p className="text-sm font-bold mb-2">
-                    TOTAL EN NOTRE FAVEUR / DOIT ÊTRE EN NOTRE POSSESSION LE {new Date(invoice.dueDate).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }).toUpperCase()}
-                  </p>
-                  <p className="text-2xl font-bold">{invoice.totalWithTva.toFixed(2)}</p>
+                <div className="border rounded-md p-4 min-w-96">
+                  <p className="text-base font-semibold mb-1">Total à payer</p>
+                  <p className="text-2xl font-bold">CHF {invoice.totalWithTva.toFixed(2)}</p>
+            
+                  <div className="text-xs text-neutral-600 mt-2">
+                    {invoice.dueDate
+                      ? <>Merci de votre règlement d’ici au <span className="font-medium">
+                          {new Date(invoice.dueDate).toLocaleDateString('fr-CH', { day:'2-digit', month:'2-digit', year:'numeric' })}
+                        </span>.</>
+                      : <>Merci de votre règlement.</>
+                    }
+                  </div>
+            
+                  {/* Optionnel : référence ou message */}
+                  {invoice.reference && (
+                    <div className="text-xs mt-1">Référence&nbsp;: {invoice.reference}</div>
+                  )}
                 </div>
               </div>
             </div>
+            
 
             {/* Ligne de séparation pour la section QR */}
             <div className="border-t border-dashed border-gray-400 pt-8 mt-auto">
