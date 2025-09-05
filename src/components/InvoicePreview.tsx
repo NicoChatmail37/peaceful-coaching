@@ -282,8 +282,8 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
                   </div>
             
                   {/* Optionnel : référence ou message */}
-                  {invoice.reference && (
-                    <div className="text-xs mt-1">Référence&nbsp;: {invoice.reference}</div>
+                  {invoice.number && (
+                    <div className="text-xs mt-1">Référence&nbsp;: {invoice.number}</div>
                   )}
                 </div>
               </div>

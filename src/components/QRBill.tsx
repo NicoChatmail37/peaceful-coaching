@@ -117,21 +117,29 @@ export const QRBill = ({ invoice }: QRBillProps) => {
     return lines.join(CRLF);
   };
 
-  // -----------------------------
-  // Génération du QR sur canvas
-  // -----------------------------
+  // --- taille QR en mm (46 mm) → pixels pour le canvas (net à l'impression)
+  const MM = 3.7795275591; // 1 mm ≈ 3.78 px @96dpi (approx pour canvas)
+  const QR_MM = 46;
+  const deviceScale = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  const QR_PX = Math.round(QR_MM * MM * deviceScale); // pixels réels du canvas
+
   useEffect(() => {
     const generateQR = async () => {
       if (canvasRef.current) {
         try {
           const qrData = generateQRData();
-          await QRCode.toCanvas(canvasRef.current, qrData, {
-            width: 160,
+
+          // dimensionne le canvas en pixels (net) et en CSS (mm)
+          const c = canvasRef.current;
+          c.width = QR_PX;
+          c.height = QR_PX;
+          c.style.width = `${QR_MM}mm`;
+          c.style.height = `${QR_MM}mm`;
+
+          await QRCode.toCanvas(c, qrData, {
+            width: QR_PX,
             margin: 0,
-            color: {
-              dark: "#000000",
-              light: "#FFFFFF",
-            },
+            color: { dark: "#000000", light: "#FFFFFF" },
             errorCorrectionLevel: "M",
           });
           setQrGenerated(true);
@@ -146,15 +154,14 @@ export const QRBill = ({ invoice }: QRBillProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice, activeCompany]);
 
-  const formatIBAN = (iban: string) => {
-    return iban.replace(/(.{4})/g, "$1 ").trim();
-  };
+  const formatIBAN = (iban: string) => iban.replace(/(.{4})/g, "$1 ").trim();
 
   return (
     <div className="border-2 border-dashed border-muted-foreground/20 p-6 bg-muted/10">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Section de réception */}
-        <div className="space-y-4">
+      {/* Grille 3 colonnes (recépissé | paiement | QR) */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr_auto] gap-6">
+        {/* 1) Récépissé */}
+        <div className="space-y-3">
           <h3 className="text-sm font-semibold">Section de réception</h3>
 
           <div className="text-xs space-y-1">
@@ -184,37 +191,9 @@ export const QRBill = ({ invoice }: QRBillProps) => {
           </div>
         </div>
 
-        {/* Section de paiement avec QR Code */}
-        <div className="space-y-4">
+        {/* 2) Section paiement */}
+        <div className="space-y-3">
           <h3 className="text-sm font-semibold">Section de paiement</h3>
-
-          {/* QR Code - Swiss QR-Bill */}
-          <div className="flex justify-center">
-            <div className="relative">
-              <canvas
-                ref={canvasRef}
-                className="border border-muted-foreground/20 bg-white"
-                style={{ width: "160px", height: "160px" }}
-              />
-              {!qrGenerated && (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/50 text-muted-foreground text-xs">
-                  Génération...
-                </div>
-              )}
-
-              {/* NOTE: pour valider le scan, on laisse la croix suisse désactivée.
-                  Tu pourras la remettre plus tard en version plus petite si souhaité. */}
-              {/*
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-6 h-6 bg-white border border-muted-foreground flex items-center justify-center">
-                  <div className="w-4 h-4 bg-red-600 flex items-center justify-center text-white text-xs font-bold">
-                    +
-                  </div>
-                </div>
-              </div>
-              */}
-            </div>
-          </div>
 
           <div className="text-xs space-y-1">
             <div className="font-medium">Compte / Payable à</div>
@@ -246,11 +225,24 @@ export const QRBill = ({ invoice }: QRBillProps) => {
               <div className="text-lg font-bold">{invoice.totalWithTva.toFixed(2)}</div>
             </div>
           </div>
+        </div>
 
-          {/* Bouton debug (facultatif) : affiche les lignes exactes */}
-          {/* <button className="text-xs underline" onClick={() => console.log(generateQRData())}>
-            Voir les lignes QR
-          </button> */}
+        {/* 3) QR 46mm */}
+        <div className="flex flex-col items-center">
+          <h3 className="text-sm font-semibold mb-2">QR-facture</h3>
+          <div className="relative">
+            <canvas
+              ref={canvasRef}
+              className="border border-muted-foreground/20 bg-white"
+              // la taille CSS est fixée via style.width/height ci-dessus
+            />
+            {!qrGenerated && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/50 text-muted-foreground text-xs">
+                Génération...
+              </div>
+            )}
+          </div>
+          <div className="text-[10px] mt-2 text-center">Code QR suisse (46 mm)</div>
         </div>
       </div>
 
