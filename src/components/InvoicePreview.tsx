@@ -291,6 +291,7 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
 
             {/* Ligne de séparation pour la section QR */}
             <div className="border-t border-dashed border-gray-400 pt-8 mt-auto">
+              {/* -mx-12 neutralise le padding p-12 du CardContent pour cette section */}
               {/* QR-Bill en bas de page dans sa position officielle */}
               <QRBill invoice={invoice} />
             </div>

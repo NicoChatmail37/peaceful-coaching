@@ -157,8 +157,10 @@ export const QRBill = ({ invoice }: QRBillProps) => {
   const formatIBAN = (iban: string) => iban.replace(/(.{4})/g, "$1 ").trim();
 
   return (
-    <div className="border-2 border-dashed border-muted-foreground/20 bg-white"
-         style={{ width: '210mm' }}>
+    <div 
+      className="border-2 border-dashed border-muted-foreground/20 bg-white"
+      style={{ width: '210mm' }}
+    >
       {/* padding global */}
       <div style={{ padding: '5mm' }}>
         {/* Hauteur standard de la bande QR : 105mm */}
