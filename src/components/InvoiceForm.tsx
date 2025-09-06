@@ -80,19 +80,25 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
   };
 
   const handleProductSelect = (index: number, product: Product | null) => {
-    console.log('handleProductSelect called with:', { index, product });
-    
     const newSelectedProducts = [...selectedProducts];
     newSelectedProducts[index] = product?.id || null;
     setSelectedProducts(newSelectedProducts);
     
     if (product) {
-      console.log('Product data:', { description: product.description, name: product.name, price: product.price });
       // Utilise directement la description du produit depuis la base de données
       const description = product.description || product.name;
-      console.log('Setting description to:', description);
-      updateItem(index, 'description', description);
-      updateItem(index, 'price', product.price);
+      
+      // Une seule mise à jour du state pour éviter les race conditions
+      setItems(prevItems => {
+        const newItems = [...prevItems];
+        newItems[index] = { 
+          ...newItems[index], 
+          description: description,
+          price: product.price,
+          total: newItems[index].quantity * product.price
+        };
+        return newItems;
+      });
     }
   };
 
