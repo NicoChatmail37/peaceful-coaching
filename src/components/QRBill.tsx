@@ -159,7 +159,7 @@ export const QRBill = ({ invoice }: QRBillProps) => {
   return (
     <div 
       className="border-2 border-dashed border-muted-foreground/20 bg-white"
-      style={{ width: '200mm', maxWidth: '200mm' }}
+      style={{ width: '190mm', maxWidth: '190mm' }}
     >
       {/* padding global */}
       <div style={{ padding: '5mm' }}>
@@ -226,8 +226,8 @@ export const QRBill = ({ invoice }: QRBillProps) => {
             <div className="text-[8px] mt-1 text-center">Code QR suisse</div>
           </div>
 
-          {/* 3) Section paiement – 80mm */}
-          <div style={{ width: '80mm', paddingLeft: '3mm' }}
+          {/* 3) Section paiement – 70mm */}
+          <div style={{ width: '70mm', paddingLeft: '3mm' }}
                className="flex flex-col">
             <div className="text-xs font-semibold mb-4">Section de paiement</div>
 
