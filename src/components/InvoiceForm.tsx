@@ -54,6 +54,7 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
   };
 
   const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
+    console.log('updateItem called with:', { index, field, value });
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     
@@ -61,6 +62,7 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
       newItems[index].total = newItems[index].quantity * newItems[index].price;
     }
     
+    console.log('Updated items:', newItems);
     setItems(newItems);
   };
 
@@ -78,13 +80,17 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
   };
 
   const handleProductSelect = (index: number, product: Product | null) => {
+    console.log('handleProductSelect called with:', { index, product });
+    
     const newSelectedProducts = [...selectedProducts];
     newSelectedProducts[index] = product?.id || null;
     setSelectedProducts(newSelectedProducts);
     
     if (product) {
+      console.log('Product data:', { description: product.description, name: product.name, price: product.price });
       // Utilise directement la description du produit depuis la base de données
       const description = product.description || product.name;
+      console.log('Setting description to:', description);
       updateItem(index, 'description', description);
       updateItem(index, 'price', product.price);
     }
