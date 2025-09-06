@@ -83,10 +83,8 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
     setSelectedProducts(newSelectedProducts);
     
     if (product) {
-      // Utilise la description du produit si elle existe, sinon le nom
-      const description = product.description ? 
-        `${product.name} - ${product.description}` : 
-        product.name;
+      // Utilise directement la description du produit depuis la base de données
+      const description = product.description || product.name;
       updateItem(index, 'description', description);
       updateItem(index, 'price', product.price);
     }
