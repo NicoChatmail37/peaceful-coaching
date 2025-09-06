@@ -178,6 +178,120 @@ export type Database = {
         }
         Relationships: []
       }
+      documents: {
+        Row: {
+          accounting_entries_generated: boolean | null
+          company_id: string | null
+          created_at: string
+          document_type: string
+          extracted_data: Json | null
+          file_path: string
+          file_size: number
+          file_type: string
+          filename: string
+          id: string
+          processed_at: string | null
+          processing_status: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          validation_status: string | null
+        }
+        Insert: {
+          accounting_entries_generated?: boolean | null
+          company_id?: string | null
+          created_at?: string
+          document_type?: string
+          extracted_data?: Json | null
+          file_path: string
+          file_size: number
+          file_type: string
+          filename: string
+          id?: string
+          processed_at?: string | null
+          processing_status?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          validation_status?: string | null
+        }
+        Update: {
+          accounting_entries_generated?: boolean | null
+          company_id?: string | null
+          created_at?: string
+          document_type?: string
+          extracted_data?: Json | null
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          filename?: string
+          id?: string
+          processed_at?: string | null
+          processing_status?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          validation_status?: string | null
+        }
+        Relationships: []
+      }
+      employees: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string | null
+          employment_type: string
+          end_date: string | null
+          first_name: string
+          hourly_rate_default: number | null
+          id: string
+          is_student: boolean | null
+          last_name: string
+          monthly_base: number | null
+          start_date: string | null
+          thirteenth_enabled: boolean | null
+          updated_at: string
+          user_id: string
+          work_rate_pct: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email?: string | null
+          employment_type?: string
+          end_date?: string | null
+          first_name: string
+          hourly_rate_default?: number | null
+          id?: string
+          is_student?: boolean | null
+          last_name: string
+          monthly_base?: number | null
+          start_date?: string | null
+          thirteenth_enabled?: boolean | null
+          updated_at?: string
+          user_id: string
+          work_rate_pct?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          employment_type?: string
+          end_date?: string | null
+          first_name?: string
+          hourly_rate_default?: number | null
+          id?: string
+          is_student?: boolean | null
+          last_name?: string
+          monthly_base?: number | null
+          start_date?: string | null
+          thirteenth_enabled?: boolean | null
+          updated_at?: string
+          user_id?: string
+          work_rate_pct?: number | null
+        }
+        Relationships: []
+      }
       invoice_items: {
         Row: {
           created_at: string
@@ -233,6 +347,7 @@ export type Database = {
           created_at: string
           date: string
           due_date: string
+          exported: boolean | null
           id: string
           notes: string | null
           number: string
@@ -250,6 +365,7 @@ export type Database = {
           created_at?: string
           date?: string
           due_date: string
+          exported?: boolean | null
           id?: string
           notes?: string | null
           number: string
@@ -267,6 +383,7 @@ export type Database = {
           created_at?: string
           date?: string
           due_date?: string
+          exported?: boolean | null
           id?: string
           notes?: string | null
           number?: string
@@ -294,6 +411,96 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payruns: {
+        Row: {
+          aanp_emp: number
+          aap_er: number
+          ac_emp: number
+          ac_er: number
+          af_er: number
+          avs_ai_apg_emp: number
+          avs_ai_apg_er: number
+          company_id: string
+          created_at: string
+          employee_id: string
+          employer_cost: number
+          gross: number
+          hourly_rate: number | null
+          hours: number | null
+          id: string
+          lpp_emp: number
+          lpp_er: number
+          mode: string
+          monthly_gross: number | null
+          net: number
+          notes: string | null
+          period_month: number
+          period_year: number
+          thirteenth_amount: number | null
+          thirteenth_fraction: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aanp_emp?: number
+          aap_er?: number
+          ac_emp?: number
+          ac_er?: number
+          af_er?: number
+          avs_ai_apg_emp?: number
+          avs_ai_apg_er?: number
+          company_id: string
+          created_at?: string
+          employee_id: string
+          employer_cost?: number
+          gross?: number
+          hourly_rate?: number | null
+          hours?: number | null
+          id?: string
+          lpp_emp?: number
+          lpp_er?: number
+          mode: string
+          monthly_gross?: number | null
+          net?: number
+          notes?: string | null
+          period_month: number
+          period_year: number
+          thirteenth_amount?: number | null
+          thirteenth_fraction?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aanp_emp?: number
+          aap_er?: number
+          ac_emp?: number
+          ac_er?: number
+          af_er?: number
+          avs_ai_apg_emp?: number
+          avs_ai_apg_er?: number
+          company_id?: string
+          created_at?: string
+          employee_id?: string
+          employer_cost?: number
+          gross?: number
+          hourly_rate?: number | null
+          hours?: number | null
+          id?: string
+          lpp_emp?: number
+          lpp_er?: number
+          mode?: string
+          monthly_gross?: number | null
+          net?: number
+          notes?: string | null
+          period_month?: number
+          period_year?: number
+          thirteenth_amount?: number | null
+          thirteenth_fraction?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       products_services: {
         Row: {
@@ -369,6 +576,108 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      rates: {
+        Row: {
+          aanp_employee: number
+          aap_employer: number
+          ac_ceiling_year: number
+          ac_employee: number
+          ac_employer: number
+          af_employer: number
+          avs_ai_apg_employee: number
+          avs_ai_apg_employer: number
+          company_id: string | null
+          created_at: string
+          id: string
+          lpp_employee: number
+          lpp_employer: number
+          lpp_enabled: boolean
+          lpp_threshold_year: number
+          notes: string | null
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          aanp_employee?: number
+          aap_employer?: number
+          ac_ceiling_year?: number
+          ac_employee?: number
+          ac_employer?: number
+          af_employer?: number
+          avs_ai_apg_employee?: number
+          avs_ai_apg_employer?: number
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          lpp_employee?: number
+          lpp_employer?: number
+          lpp_enabled?: boolean
+          lpp_threshold_year?: number
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          aanp_employee?: number
+          aap_employer?: number
+          ac_ceiling_year?: number
+          ac_employee?: number
+          ac_employer?: number
+          af_employer?: number
+          avs_ai_apg_employee?: number
+          avs_ai_apg_employer?: number
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          lpp_employee?: number
+          lpp_employer?: number
+          lpp_enabled?: boolean
+          lpp_threshold_year?: number
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          ai_api_key: string | null
+          ai_provider: string
+          auto_process: boolean | null
+          company_id: string
+          created_at: string
+          default_accounts: Json | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_api_key?: string | null
+          ai_provider?: string
+          auto_process?: boolean | null
+          company_id: string
+          created_at?: string
+          default_accounts?: Json | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_api_key?: string | null
+          ai_provider?: string
+          auto_process?: boolean | null
+          company_id?: string
+          created_at?: string
+          default_accounts?: Json | null
           id?: string
           updated_at?: string
           user_id?: string

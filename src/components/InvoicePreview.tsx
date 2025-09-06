@@ -2,13 +2,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Invoice } from "@/pages/Index";
 import { QRBill } from "@/components/QRBill";
-import { AccountingExport } from "@/components/AccountingExport";
-import { Download, Send, Eye } from "lucide-react";
+import { Download, Send, Eye, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/hooks/useCompany";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { useInvoices, FullInvoice } from "@/hooks/useInvoices";
+import { useInvoices } from "@/hooks/useInvoices";
+import { useClients } from "@/hooks/useClients";
 
 interface InvoicePreviewProps {
   invoice: Invoice;
@@ -19,6 +19,7 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
   const { toast } = useToast();
   const { activeCompany } = useCompany();
   const { updateInvoiceStatus } = useInvoices();
+  const { clients } = useClients();
 
   const handleExportPDF = async () => {
     try {
@@ -83,6 +84,10 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
 
   const handleSendEmail = async () => {
     try {
+      // Find client email
+      const client = clients.find(c => c.name === invoice.clientName);
+      const clientEmail = client?.email || '';
+
       // Generate PDF first
       const element = document.querySelector('.invoice-preview') as HTMLElement;
       if (!element || !activeCompany) {
@@ -129,9 +134,10 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
       const emailTemplate = activeCompany.email_template || "Bonjour,\n\nVeuillez trouver ci-joint votre facture.\n\nCordialement,\n{company_name}";
       const emailBody = emailTemplate.replace('{company_name}', activeCompany.name);
 
-      // Create mailto link with attachment (note: attachments don't work in mailto)
+      // Create mailto link with client email and attachment note
       const subject = `Facture ${invoice.number} - ${activeCompany.name}`;
-      const mailtoLink = `mailto:${invoice.clientName ? '' : ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+      const enhancedBody = `${emailBody}\n\n--- \nNote: Le PDF de la facture a été téléchargé automatiquement. Veuillez le joindre à cet email.`;
+      const mailtoLink = `mailto:${clientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(enhancedBody)}`;
 
       // Open email client
       window.open(mailtoLink);
@@ -151,13 +157,36 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
 
       toast({
         title: "Email préparé",
-        description: "L'email s'ouvre dans votre client mail. Le PDF a été téléchargé séparément à joindre manuellement.",
+        description: clientEmail 
+          ? `Email ouvert avec l'adresse ${clientEmail}. Le PDF a été téléchargé à joindre manuellement.`
+          : "Email ouvert. Le PDF a été téléchargé à joindre manuellement.",
       });
     } catch (error) {
       console.error('Error preparing email:', error);
       toast({
         title: "Erreur",
         description: "Erreur lors de la préparation de l'email.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSendAndExport = async () => {
+    try {
+      // First export the PDF
+      await handleExportPDF();
+      // Then prepare the email
+      await handleSendEmail();
+      
+      toast({
+        title: "Envoi et export terminés",
+        description: "La facture a été exportée et l'email préparé.",
+      });
+    } catch (error) {
+      console.error('Error in send and export:', error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de l'envoi et export.",
         variant: "destructive"
       });
     }
@@ -183,7 +212,11 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
             <Send className="w-4 h-4 mr-2" />
             Envoyer
           </Button>
-          <Button size="sm" onClick={() => window.print()}>
+          <Button size="sm" onClick={handleSendAndExport}>
+            <Mail className="w-4 h-4 mr-2" />
+            Envoyer et Exporter
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Eye className="w-4 h-4 mr-2" />
             Imprimer
           </Button>
@@ -298,10 +331,6 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
           </CardContent>
         </Card>
 
-        {/* Panneau latéral - Export comptabilité (affiché uniquement à l'écran) */}
-        <div className="mt-6 print:hidden">
-          <AccountingExport invoice={invoice} />
-        </div>
       </div>
 
       <style>{`
