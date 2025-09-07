@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const signInAttemptsRef = useRef<Map<string, { count: number; lastAttempt: number }>>(new Map());
 
   const cleanupAuthState = () => {
     Object.keys(localStorage).forEach((key) => {
@@ -95,6 +96,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      // Rate limiting check
+      const attempts = signInAttemptsRef.current.get(email) || { count: 0, lastAttempt: 0 };
+      const now = Date.now();
+      const timeDiff = now - attempts.lastAttempt;
+      
+      // Reset count if more than 15 minutes passed
+      if (timeDiff > 15 * 60 * 1000) {
+        attempts.count = 0;
+      }
+      
+      // Block if too many attempts
+      if (attempts.count >= 5) {
+        const waitTime = Math.ceil((15 * 60 * 1000 - timeDiff) / 1000 / 60);
+        return { 
+          error: { 
+            message: `Trop de tentatives. Réessayez dans ${waitTime} minutes.` 
+          } 
+        };
+      }
+
       cleanupAuthState();
       try {
         await supabase.auth.signOut({ scope: 'global' });
@@ -107,7 +128,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         password,
       });
       
-      if (error) return { error };
+      if (error) {
+        // Increment failed attempts
+        signInAttemptsRef.current.set(email, {
+          count: attempts.count + 1,
+          lastAttempt: now
+        });
+        return { error };
+      }
+
+      // Clear failed attempts on success
+      signInAttemptsRef.current.delete(email);
       
       if (data.user) {
         window.location.href = '/';

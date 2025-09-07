@@ -5,8 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/hooks/useCompany";
-import { Building, Save, Mail } from "lucide-react";
+import { Building, Save, Mail, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { 
+  validateSwissIBAN, 
+  validateSwissVAT, 
+  validateSwissPhone, 
+  validateSwissPostalCode, 
+  validateEmail, 
+  validateTextInput,
+  sanitizeHTML 
+} from "@/lib/validation";
 
 export const CompanySettings = () => {
   const { toast } = useToast();
@@ -22,6 +31,8 @@ export const CompanySettings = () => {
     tva_number: "",
     email_template: ""
   });
+
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Sync form data with active company
   useEffect(() => {
@@ -41,10 +52,101 @@ export const CompanySettings = () => {
   }, [activeCompany]);
 
   const handleInputChange = (field: string, value: string) => {
+    // Clear validation error when user starts typing
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+
+    // Apply length limits and sanitization
+    let sanitizedValue = value;
+    if (field === 'email_template') {
+      sanitizedValue = sanitizeHTML(value);
+    }
+
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: sanitizedValue
     }));
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Required field validation
+    if (!formData.name.trim()) {
+      errors.name = "Le nom de l'entreprise est requis";
+    } else if (formData.name.length > 100) {
+      errors.name = "Le nom ne peut dépasser 100 caractères";
+    }
+
+    if (!formData.address.trim()) {
+      errors.address = "L'adresse est requise";
+    } else if (formData.address.length > 200) {
+      errors.address = "L'adresse ne peut dépasser 200 caractères";
+    }
+
+    if (!formData.iban.trim()) {
+      errors.iban = "L'IBAN est requis";
+    } else {
+      const ibanValidation = validateSwissIBAN(formData.iban);
+      if (!ibanValidation.isValid) {
+        errors.iban = ibanValidation.message!;
+      }
+    }
+
+    // NPA validation
+    if (formData.npa.trim()) {
+      const npaValidation = validateSwissPostalCode(formData.npa);
+      if (!npaValidation.isValid) {
+        errors.npa = npaValidation.message!;
+      }
+    }
+
+    // Email validation
+    if (formData.email.trim()) {
+      const emailValidation = validateEmail(formData.email);
+      if (!emailValidation.isValid) {
+        errors.email = emailValidation.message!;
+      }
+    }
+
+    // Phone validation
+    if (formData.phone.trim()) {
+      const phoneValidation = validateSwissPhone(formData.phone);
+      if (!phoneValidation.isValid) {
+        errors.phone = phoneValidation.message!;
+      }
+    }
+
+    // VAT validation
+    if (formData.tva_number.trim()) {
+      const vatValidation = validateSwissVAT(formData.tva_number);
+      if (!vatValidation.isValid) {
+        errors.tva_number = vatValidation.message!;
+      }
+    }
+
+    // Text fields validation
+    const textFields = [
+      { field: 'city', maxLength: 50, name: 'La ville' },
+      { field: 'email_template', maxLength: 2000, name: 'Le modèle d\'email' }
+    ];
+
+    textFields.forEach(({ field, maxLength, name }) => {
+      if (formData[field as keyof typeof formData]) {
+        const validation = validateTextInput(formData[field as keyof typeof formData] as string, maxLength, name);
+        if (!validation.isValid) {
+          errors[field] = validation.message!;
+        }
+      }
+    });
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSave = async () => {
@@ -57,10 +159,10 @@ export const CompanySettings = () => {
       return;
     }
 
-    if (!formData.name || !formData.iban) {
+    if (!validateForm()) {
       toast({
-        title: "Informations incomplètes",
-        description: "Veuillez au minimum renseigner le nom de l'entreprise et l'IBAN.",
+        title: "Informations invalides",
+        description: "Veuillez corriger les erreurs dans le formulaire",
         variant: "destructive"
       });
       return;
@@ -73,10 +175,6 @@ export const CompanySettings = () => {
     }
   };
 
-  const validateIBAN = (iban: string) => {
-    const cleaned = iban.replace(/\s/g, '');
-    return cleaned.length >= 15 && cleaned.startsWith('CH');
-  };
 
   if (!activeCompany) {
     return (
@@ -115,7 +213,15 @@ export const CompanySettings = () => {
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="Mon Entreprise SA"
+                maxLength={100}
+                className={validationErrors.name ? 'border-destructive' : ''}
               />
+              {validationErrors.name && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {validationErrors.name}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="companyAddress">Adresse *</Label>
@@ -124,7 +230,15 @@ export const CompanySettings = () => {
                 value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
                 placeholder="Rue de la Paix 123"
+                maxLength={200}
+                className={validationErrors.address ? 'border-destructive' : ''}
               />
+              {validationErrors.address && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {validationErrors.address}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="companyNPA">NPA *</Label>
@@ -133,7 +247,15 @@ export const CompanySettings = () => {
                 value={formData.npa}
                 onChange={(e) => handleInputChange('npa', e.target.value)}
                 placeholder="1000"
+                maxLength={4}
+                className={validationErrors.npa ? 'border-destructive' : ''}
               />
+              {validationErrors.npa && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {validationErrors.npa}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="companyCity">Ville *</Label>
@@ -142,7 +264,15 @@ export const CompanySettings = () => {
                 value={formData.city}
                 onChange={(e) => handleInputChange('city', e.target.value)}
                 placeholder="Lausanne"
+                maxLength={50}
+                className={validationErrors.city ? 'border-destructive' : ''}
               />
+              {validationErrors.city && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {validationErrors.city}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="companyPhone">Téléphone</Label>
@@ -151,7 +281,15 @@ export const CompanySettings = () => {
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 placeholder="+41 21 123 45 67"
+                maxLength={20}
+                className={validationErrors.phone ? 'border-destructive' : ''}
               />
+              {validationErrors.phone && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {validationErrors.phone}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="companyEmail">Email</Label>
@@ -161,7 +299,15 @@ export const CompanySettings = () => {
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 placeholder="contact@monentreprise.ch"
+                maxLength={254}
+                className={validationErrors.email ? 'border-destructive' : ''}
               />
+              {validationErrors.email && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {validationErrors.email}
+                </p>
+              )}
             </div>
           </div>
 
@@ -172,10 +318,14 @@ export const CompanySettings = () => {
               value={formData.iban}
               onChange={(e) => handleInputChange('iban', e.target.value)}
               placeholder="CH93 0076 2011 6238 5295 7"
-              className={!validateIBAN(formData.iban) && formData.iban ? 'border-destructive' : ''}
+              maxLength={34}
+              className={validationErrors.iban ? 'border-destructive' : ''}
             />
-            {!validateIBAN(formData.iban) && formData.iban && (
-              <p className="text-sm text-destructive">Format IBAN invalide (doit commencer par CH)</p>
+            {validationErrors.iban && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {validationErrors.iban}
+              </p>
             )}
           </div>
 
@@ -186,7 +336,15 @@ export const CompanySettings = () => {
               value={formData.tva_number}
               onChange={(e) => handleInputChange('tva_number', e.target.value)}
               placeholder="CHE-123.456.789 TVA"
+              maxLength={20}
+              className={validationErrors.tva_number ? 'border-destructive' : ''}
             />
+            {validationErrors.tva_number && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {validationErrors.tva_number}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end">
@@ -217,8 +375,15 @@ export const CompanySettings = () => {
               onChange={(e) => handleInputChange('email_template', e.target.value)}
               placeholder="Bonjour,\n\nVeuillez trouver ci-joint votre facture.\n\nCordialement,\n{company_name}"
               rows={6}
-              className="min-h-32"
+              maxLength={2000}
+              className={`min-h-32 ${validationErrors.email_template ? 'border-destructive' : ''}`}
             />
+            {validationErrors.email_template && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {validationErrors.email_template}
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               Ce texte sera utilisé comme contenu de l'email lors de l'envoi des factures.
             </p>

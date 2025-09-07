@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, LogIn, UserPlus, Shield, AlertTriangle } from 'lucide-react';
+import { validatePassword, validateEmail, validateTextInput } from '@/lib/validation';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -17,6 +18,9 @@ const Auth = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [passwordValidation, setPasswordValidation] = useState<{isValid: boolean; message?: string}>({ isValid: true });
+  const [emailValidation, setEmailValidation] = useState<{isValid: boolean; message?: string}>({ isValid: true });
+  const [nameValidation, setNameValidation] = useState<{isValid: boolean; message?: string}>({ isValid: true });
 
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
@@ -27,10 +31,45 @@ const Auth = () => {
     }
   }, [user, navigate]);
 
+  const validateForm = (): boolean => {
+    let isValid = true;
+
+    // Email validation
+    const emailValidation = validateEmail(email);
+    setEmailValidation(emailValidation);
+    if (!emailValidation.isValid) isValid = false;
+
+    // Password validation (only for signup or if password is entered for login)
+    if (!isLogin || password) {
+      const passwordValidation = validatePassword(password);
+      setPasswordValidation(passwordValidation);
+      if (!passwordValidation.isValid) isValid = false;
+    }
+
+    // Full name validation for signup
+    if (!isLogin) {
+      const nameValidation = validateTextInput(fullName, 100, "Le nom complet");
+      setNameValidation(nameValidation);
+      if (!nameValidation.isValid) isValid = false;
+      
+      if (fullName.trim().length < 2) {
+        setNameValidation({ isValid: false, message: "Le nom complet doit contenir au moins 2 caractères" });
+        isValid = false;
+      }
+    }
+
+    return isValid;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -39,6 +78,8 @@ const Auth = () => {
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
             setError('Email ou mot de passe incorrect');
+          } else if (error.message.includes('too many requests')) {
+            setError('Trop de tentatives. Veuillez réessayer dans quelques minutes.');
           } else {
             setError(error.message);
           }
@@ -48,6 +89,8 @@ const Auth = () => {
         if (error) {
           if (error.message.includes('User already registered')) {
             setError('Un compte existe déjà avec cet email');
+          } else if (error.message.includes('Password should be')) {
+            setError('Le mot de passe ne respecte pas les exigences de sécurité');
           } else {
             setError(error.message);
           }
@@ -96,10 +139,22 @@ const Auth = () => {
                     type="text"
                     placeholder="Jean Dupont"
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (nameValidation.message) {
+                        setNameValidation({ isValid: true });
+                      }
+                    }}
                     required={!isLogin}
-                    className="transition-all duration-200 focus:ring-primary"
+                    maxLength={100}
+                    className={`transition-all duration-200 focus:ring-primary ${!nameValidation.isValid ? 'border-destructive' : ''}`}
                   />
+                  {!nameValidation.isValid && nameValidation.message && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {nameValidation.message}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -110,10 +165,22 @@ const Auth = () => {
                   type="email"
                   placeholder="jean@exemple.ch"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailValidation.message) {
+                      setEmailValidation({ isValid: true });
+                    }
+                  }}
                   required
-                  className="transition-all duration-200 focus:ring-primary"
+                  maxLength={254}
+                  className={`transition-all duration-200 focus:ring-primary ${!emailValidation.isValid ? 'border-destructive' : ''}`}
                 />
+                {!emailValidation.isValid && emailValidation.message && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {emailValidation.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -124,10 +191,16 @@ const Auth = () => {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (passwordValidation.message) {
+                        setPasswordValidation({ isValid: true });
+                      }
+                    }}
                     required
-                    minLength={6}
-                    className="pr-10 transition-all duration-200 focus:ring-primary"
+                    minLength={8}
+                    maxLength={128}
+                    className={`pr-10 transition-all duration-200 focus:ring-primary ${!passwordValidation.isValid ? 'border-destructive' : ''}`}
                   />
                   <Button
                     type="button"
@@ -143,6 +216,25 @@ const Auth = () => {
                     )}
                   </Button>
                 </div>
+                {!passwordValidation.isValid && passwordValidation.message && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {passwordValidation.message}
+                  </p>
+                )}
+                {!isLogin && (
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-3 w-3" />
+                      <span>Exigences de sécurité:</span>
+                    </div>
+                    <ul className="text-xs space-y-1 ml-5 list-disc">
+                      <li>Au moins 8 caractères</li>
+                      <li>Une majuscule et une minuscule</li>
+                      <li>Un chiffre et un caractère spécial</li>
+                    </ul>
+                  </div>
+                )}
               </div>
 
               {error && (
