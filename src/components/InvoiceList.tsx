@@ -42,7 +42,7 @@ const convertSupabaseToLocal = (supabaseInvoice: FullInvoice): Invoice => {
 };
 
 export const InvoiceList = ({ invoices, onInvoiceSelect }: InvoiceListProps) => {
-  const { invoices: supabaseInvoices, loading, updateInvoiceStatus } = useInvoices();
+  const { invoices: supabaseInvoices, loading, updateInvoiceStatus, deleteInvoices } = useInvoices();
   const { toast } = useToast();
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [exportFormat, setExportFormat] = useState("json");
@@ -141,18 +141,23 @@ export const InvoiceList = ({ invoices, onInvoiceSelect }: InvoiceListProps) => 
   };
 
   const handleBulkDelete = async () => {
-    if (selectedInvoices.length === 0) return;
+    if (selectedInvoices.length === 0) {
+      toast({
+        title: "Aucune sélection",
+        description: "Veuillez sélectionner des factures à supprimer",
+        variant: "destructive"
+      });
+      return;
+    }
     
     if (!confirm(`Êtes-vous sûr de vouloir supprimer ${selectedInvoices.length} facture(s) ?`)) {
       return;
     }
 
-    // Note: Implementation would need deleteInvoice function in useInvoices hook
-    toast({
-      title: "Suppression en cours...",
-      description: `Suppression de ${selectedInvoices.length} facture(s)`,
-    });
-    setSelectedInvoices([]);
+    const success = await deleteInvoices(selectedInvoices);
+    if (success) {
+      setSelectedInvoices([]);
+    }
   };
 
   const generateAccountingData = (invoice: Invoice) => {
@@ -334,102 +339,40 @@ ${selectedData.map(data => `  <invoice>
         </Card>
       </div>
 
-      {/* Actions de sélection */}
-      {selectedInvoices.length > 0 && (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="text-sm">
-                <span className="font-medium">{selectedInvoices.length}</span> facture(s) sélectionnée(s)
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleBulkDelete}>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Supprimer
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleBulkExport}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Exporter
-                </Button>
-              </div>
+      {/* Barre d'actions toujours visible */}
+      <Card className={selectedInvoices.length > 0 ? "border-primary/20 bg-primary/5" : ""}>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="text-sm">
+              {selectedInvoices.length > 0 ? (
+                <span><span className="font-medium">{selectedInvoices.length}</span> facture(s) sélectionnée(s)</span>
+              ) : (
+                <span>Sélectionnez des factures pour les actions groupées</span>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Options d'export et Zapier */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              📊 Export comptabilité
-            </CardTitle>
-            <CardDescription>
-              Exportez les données vers votre logiciel de comptabilité
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Format d'export</Label>
-              <Select value={exportFormat} onValueChange={setExportFormat}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="json">JSON</SelectItem>
-                  <SelectItem value="csv">CSV</SelectItem>
-                  <SelectItem value="xml">XML</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex gap-2">
+              <Button 
+                variant={selectedInvoices.length > 0 ? "destructive" : "outline"}
+                size="sm" 
+                onClick={handleBulkDelete}
+                disabled={selectedInvoices.length === 0}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Supprimer ({selectedInvoices.length})
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleBulkExport}
+                disabled={selectedInvoices.length === 0}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exporter ({selectedInvoices.length})
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Sélectionnez des factures ci-dessous puis cliquez sur "Exporter"
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5" />
-              Zapier Integration
-            </CardTitle>
-            <CardDescription>
-              Envoyez automatiquement vers Bexio, AbaClik ou autre via Zapier
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="webhookUrl">URL du webhook Zapier</Label>
-              <Input
-                id="webhookUrl"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                placeholder="https://hooks.zapier.com/hooks/catch/..."
-              />
-            </div>
-
-            <Button 
-              onClick={handleZapierSend} 
-              disabled={isLoading || !webhookUrl || selectedInvoices.length === 0}
-              size="sm"
-              className="w-full"
-            >
-              <Send className="w-4 h-4 mr-2" />
-              {isLoading ? "Envoi..." : "Envoyer vers Zapier"}
-            </Button>
-
-            <div className="text-xs text-muted-foreground">
-              <p className="mb-2">💡 Pour connecter Zapier :</p>
-              <ol className="list-decimal list-inside space-y-1 ml-2">
-                <li>Créez un Zap avec un trigger "Webhooks by Zapier"</li>
-                <li>Copiez l'URL du webhook</li>
-                <li>Connectez à Bexio, AbaClik ou votre logiciel comptable</li>
-              </ol>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Liste des factures */}
       <Card>
@@ -503,6 +446,80 @@ ${selectedData.map(data => `  <invoice>
           </div>
         </CardContent>
       </Card>
+
+      {/* Options d'export et Zapier en bas de page */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              📊 Export comptabilité
+            </CardTitle>
+            <CardDescription>
+              Exportez les données vers votre logiciel de comptabilité
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Format d'export</Label>
+              <Select value={exportFormat} onValueChange={setExportFormat}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="json">JSON</SelectItem>
+                  <SelectItem value="csv">CSV</SelectItem>
+                  <SelectItem value="xml">XML</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sélectionnez des factures ci-dessus puis cliquez sur "Exporter"
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5" />
+              Zapier Integration
+            </CardTitle>
+            <CardDescription>
+              Envoyez automatiquement vers Bexio, AbaClik ou autre via Zapier
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="webhookUrl">URL du webhook Zapier</Label>
+              <Input
+                id="webhookUrl"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                placeholder="https://hooks.zapier.com/hooks/catch/..."
+              />
+            </div>
+
+            <Button 
+              onClick={handleZapierSend} 
+              disabled={isLoading || !webhookUrl || selectedInvoices.length === 0}
+              size="sm"
+              className="w-full"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {isLoading ? "Envoi..." : "Envoyer vers Zapier"}
+            </Button>
+
+            <div className="text-xs text-muted-foreground">
+              <p className="mb-2">💡 Pour connecter Zapier :</p>
+              <ol className="list-decimal list-inside space-y-1 ml-2">
+                <li>Créez un Zap avec un trigger "Webhooks by Zapier"</li>
+                <li>Copiez l'URL du webhook</li>
+                <li>Connectez à Bexio, AbaClik ou votre logiciel comptable</li>
+              </ol>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

@@ -190,6 +190,43 @@ export const useInvoices = () => {
     }
   };
 
+  const deleteInvoices = async (invoiceIds: string[]): Promise<boolean> => {
+    try {
+      // First delete invoice items
+      const { error: itemsError } = await supabase
+        .from('invoice_items')
+        .delete()
+        .in('invoice_id', invoiceIds);
+
+      if (itemsError) throw itemsError;
+
+      // Then delete invoices
+      const { error: invoicesError } = await supabase
+        .from('invoices')
+        .delete()
+        .in('id', invoiceIds);
+
+      if (invoicesError) throw invoicesError;
+
+      await fetchInvoices();
+      
+      toast({
+        title: "Suppression réussie",
+        description: `${invoiceIds.length} facture(s) supprimée(s)`
+      });
+
+      return true;
+    } catch (error: any) {
+      console.error('Error deleting invoices:', error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la suppression des factures",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchInvoices();
   }, [activeCompany]);
@@ -199,6 +236,7 @@ export const useInvoices = () => {
     loading,
     fetchInvoices,
     saveInvoice,
-    updateInvoiceStatus
+    updateInvoiceStatus,
+    deleteInvoices
   };
 };
