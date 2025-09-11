@@ -5,6 +5,8 @@ import { InvoicePreview } from "@/components/InvoicePreview";
 import { InvoiceList } from "@/components/InvoiceList";
 import { CompanySettings } from "@/components/CompanySettings";
 import { CompanyManagement } from "@/components/CompanyManagement";
+import { PatientsAndSessions } from "@/components/PatientsAndSessions";
+import { Agenda } from "@/components/Agenda";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import Clients from "./Clients";
@@ -37,7 +39,7 @@ export interface InvoiceItem {
 
 
 const Index = () => {
-  const [currentTab, setCurrentTab] = useState("create");
+  const [currentTab, setCurrentTab] = useState("patients");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const { invoices: supabaseInvoices } = useInvoices();
@@ -68,14 +70,18 @@ const Index = () => {
         </div>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1">
+            <TabsTrigger value="patients" className="flex items-center gap-2">
+              <span className="text-lg">🏥</span>
+              Patients & Séances
+            </TabsTrigger>
+            <TabsTrigger value="agenda" className="flex items-center gap-2">
+              <span className="text-lg">📅</span>
+              Agenda
+            </TabsTrigger>
             <TabsTrigger value="create" className="flex items-center gap-2">
               <span className="text-lg">📄</span>
               Créer
-            </TabsTrigger>
-            <TabsTrigger value="preview" className="flex items-center gap-2">
-              <span className="text-lg">👁️</span>
-              Aperçu
             </TabsTrigger>
             <TabsTrigger value="list" className="flex items-center gap-2">
               <span className="text-lg">📋</span>
@@ -94,6 +100,14 @@ const Index = () => {
               Paramètres
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="patients" className="space-y-6">
+            <PatientsAndSessions />
+          </TabsContent>
+
+          <TabsContent value="agenda" className="space-y-6">
+            <Agenda />
+          </TabsContent>
 
           <TabsContent value="create" className="space-y-6">
             <InvoiceForm 
