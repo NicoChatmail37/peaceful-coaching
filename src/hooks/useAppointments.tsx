@@ -38,7 +38,7 @@ export const useAppointments = (startDate?: Date, endDate?: Date) => {
         .from('invoice_appointments')
         .select(`
           *,
-          clients(name, email)
+          clients!invoice_appointments_client_id_fkey(name, email)
         `)
         .eq('company_id', activeCompany.id)
         .order('starts_at', { ascending: true });
@@ -231,10 +231,7 @@ export const useAppointments = (startDate?: Date, endDate?: Date) => {
     try {
       const { data, error } = await supabase
         .from('view_uninvoiced_appointments')
-        .select(`
-          *,
-          clients(name, email)
-        `)
+        .select('*')
         .eq('company_id', activeCompany.id);
 
       if (error) throw error;
@@ -242,8 +239,8 @@ export const useAppointments = (startDate?: Date, endDate?: Date) => {
       return data?.map(appointment => ({
         ...appointment,
         status: appointment.status as 'scheduled' | 'done' | 'canceled' | 'no_show',
-        client_name: (appointment.clients as any)?.name || 'Client inconnu',
-        client_email: (appointment.clients as any)?.email
+        client_name: appointment.client_name || 'Client inconnu',
+        client_email: appointment.client_email
       })) || [];
     } catch (error) {
       console.error('Error fetching uninvoiced appointments:', error);

@@ -822,7 +822,22 @@ export type Database = {
           title?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_appointments_client_id"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_appointments_company_id"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoice_items: {
         Row: {
@@ -951,7 +966,22 @@ export type Database = {
           transcript_text?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_sessions_client_id"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_sessions_company_id"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoices: {
         Row: {
@@ -1670,7 +1700,22 @@ export type Database = {
           ended_at: string | null
           notes_text: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_sessions_client_id"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_sessions_company_id"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       view_patient_timeline: {
         Row: {
@@ -1740,7 +1785,9 @@ export type Database = {
       }
       view_uninvoiced_appointments: {
         Row: {
+          client_email: string | null
           client_id: string | null
+          client_name: string | null
           company_id: string | null
           created_at: string | null
           ends_at: string | null
@@ -1753,35 +1800,22 @@ export type Database = {
           title: string | null
           updated_at: string | null
         }
-        Insert: {
-          client_id?: string | null
-          company_id?: string | null
-          created_at?: string | null
-          ends_at?: string | null
-          id?: string | null
-          invoice_id?: string | null
-          location?: string | null
-          session_id?: string | null
-          starts_at?: string | null
-          status?: string | null
-          title?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          client_id?: string | null
-          company_id?: string | null
-          created_at?: string | null
-          ends_at?: string | null
-          id?: string | null
-          invoice_id?: string | null
-          location?: string | null
-          session_id?: string | null
-          starts_at?: string | null
-          status?: string | null
-          title?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_appointments_client_id"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_appointments_company_id"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
