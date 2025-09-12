@@ -40,7 +40,7 @@ export const useSessions = (clientId?: string) => {
         .from('invoice_sessions')
         .select(`
           *,
-          clients!invoice_sessions_client_id_fkey(name, email)
+          clients!fk_sessions_client_id(name, email)
         `)
         .eq('company_id', activeCompany.id)
         .order('started_at', { ascending: false });

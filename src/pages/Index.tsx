@@ -72,8 +72,8 @@ const Index = () => {
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1">
             <TabsTrigger value="patients" className="flex items-center gap-2">
-              <span className="text-lg">🏥</span>
-              Patients & Séances
+              <span className="text-lg">👥</span>
+              Clients & Séances
             </TabsTrigger>
             <TabsTrigger value="agenda" className="flex items-center gap-2">
               <span className="text-lg">📅</span>
@@ -88,8 +88,8 @@ const Index = () => {
               Factures
             </TabsTrigger>
             <TabsTrigger value="clients" className="flex items-center gap-2">
-              <span className="text-lg">👥</span>
-              Clients
+              <span className="text-lg">📞</span>
+              Contacts
             </TabsTrigger>
             <TabsTrigger value="products" className="flex items-center gap-2">
               <span className="text-lg">📦</span>

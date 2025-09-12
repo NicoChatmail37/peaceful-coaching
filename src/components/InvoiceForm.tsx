@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { Invoice, InvoiceItem } from "@/pages/Index";
 import { useToast } from "@/hooks/use-toast";
@@ -30,7 +31,8 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
     clientNPA: "",
     clientCity: "",
     notes: "",
-    includeTva: false
+    includeTva: false,
+    paymentFormat: "qr" as "cash" | "card" | "qr"
   });
   
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -136,6 +138,9 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    // Determine status based on payment format
+    const invoiceStatus = (formData.paymentFormat === "cash" || formData.paymentFormat === "card") ? 'paid' : 'draft';
+    
     // Create invoice for Supabase
     const supabaseInvoice: FullInvoice = {
       number: invoiceNumber,
@@ -146,7 +151,7 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
       tva_amount: formData.includeTva ? tva : 0,
       total: formData.includeTva ? totalWithTva : subtotal,
       notes: formData.notes,
-      status: 'draft',
+      status: invoiceStatus,
       clientName: formData.clientName,
       clientAddress: formData.clientAddress,
       clientNPA: formData.clientNPA,
@@ -190,7 +195,8 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
         clientNPA: "",
         clientCity: "",
         notes: "",
-        includeTva: false
+        includeTva: false,
+        paymentFormat: "qr" as "cash" | "card" | "qr"
       });
       setItems([{ description: "", quantity: 1, price: 0, total: 0 }]);
       setSelectedClient(null);
@@ -350,10 +356,53 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
 
       <Card>
         <CardHeader>
-          <CardTitle>💰 Total de la facture</CardTitle>
+          <CardTitle>💰 Total et paiement</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between mb-4">
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="paymentFormat">Mode de paiement</Label>
+            <Select
+              value={formData.paymentFormat}
+              onValueChange={(value: "cash" | "card" | "qr") => 
+                setFormData({ ...formData, paymentFormat: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner le mode de paiement" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">
+                  <div className="flex items-center gap-2">
+                    <span>💵</span>
+                    <div>
+                      <div className="font-medium">Espèces</div>
+                      <div className="text-xs text-muted-foreground">Paiement immédiat</div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="card">
+                  <div className="flex items-center gap-2">
+                    <span>💳</span>
+                    <div>
+                      <div className="font-medium">Carte</div>
+                      <div className="text-xs text-muted-foreground">Paiement immédiat</div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="qr">
+                  <div className="flex items-center gap-2">
+                    <span>📱</span>
+                    <div>
+                      <div className="font-medium">QR-Bill</div>
+                      <div className="text-xs text-muted-foreground">Paiement différé avec QR</div>
+                    </div>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="flex items-center justify-between">
             <Label htmlFor="includeTva" className="text-sm font-medium">
               Inclure la TVA (7.7%)
             </Label>
@@ -401,7 +450,9 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
           size="lg"
           className="bg-gradient-primary hover:bg-primary/90 shadow-glow"
         >
-          ✨ Créer la facture
+          {formData.paymentFormat === "qr" ? "📱 Créer facture avec QR-Bill" : 
+           formData.paymentFormat === "cash" ? "💵 Facture payée (Espèces)" : 
+           "💳 Facture payée (Carte)"}
         </Button>
       </div>
     </form>

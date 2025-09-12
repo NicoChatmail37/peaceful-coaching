@@ -38,7 +38,7 @@ export const useAppointments = (startDate?: Date, endDate?: Date) => {
         .from('invoice_appointments')
         .select(`
           *,
-          clients!invoice_appointments_client_id_fkey(name, email)
+          clients!fk_appointments_client_id(name, email)
         `)
         .eq('company_id', activeCompany.id)
         .order('starts_at', { ascending: true });
