@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "./useCompany";
+import { useSelectedClient } from "@/contexts/SelectedClientContext";
 
 export interface InvoiceData {
   id?: string;
@@ -45,6 +46,7 @@ export const useInvoices = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { activeCompany } = useCompany();
+  const { selectedClient } = useSelectedClient();
 
   const fetchInvoices = async () => {
     if (!activeCompany?.id) return;
@@ -113,6 +115,7 @@ export const useInvoices = () => {
         .insert({
           user_id: (await supabase.auth.getUser()).data.user?.id,
           company_id: activeCompany.id,
+          client_id: invoiceData.client_id || selectedClient?.id,
           number: invoiceData.number,
           date: invoiceData.date,
           due_date: invoiceData.due_date,

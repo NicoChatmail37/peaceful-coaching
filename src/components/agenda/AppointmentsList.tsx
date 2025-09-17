@@ -9,11 +9,13 @@ import { AppointmentWithClient, useAppointments } from "@/hooks/useAppointments"
 interface AppointmentsListProps {
   appointments: AppointmentWithClient[];
   loading: boolean;
+  onSelectAppointment?: (appointment: AppointmentWithClient) => void;
 }
 
 export const AppointmentsList = ({
   appointments,
-  loading
+  loading,
+  onSelectAppointment
 }: AppointmentsListProps) => {
   const { convertToSession, updateAppointment } = useAppointments();
 
@@ -91,7 +93,7 @@ export const AppointmentsList = ({
           
           <div className="space-y-3">
             {dayAppointments.map((appointment) => (
-              <Card key={appointment.id} className="overflow-hidden">
+              <Card key={appointment.id} className="overflow-hidden cursor-pointer hover:bg-accent/50" onClick={() => onSelectAppointment?.(appointment)}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">

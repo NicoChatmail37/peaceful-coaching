@@ -10,6 +10,8 @@ import { Eye, FileText, CheckCircle, Clock, Trash2, Download, Send, Zap } from "
 import { useInvoices, FullInvoice } from "@/hooks/useInvoices";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { ClientFilter } from "./ClientFilter";
+import { Client } from "@/hooks/useClients";
 
 interface InvoiceListProps {
   invoices: Invoice[];
@@ -48,11 +50,20 @@ export const InvoiceList = ({ invoices, onInvoiceSelect }: InvoiceListProps) => 
   const [exportFormat, setExportFormat] = useState("json");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [filterClient, setFilterClient] = useState<Client | null>(null);
 
   // Use Supabase invoices if available, fallback to local invoices
-  const displayInvoices = supabaseInvoices.length > 0 
+  const allInvoices = supabaseInvoices.length > 0 
     ? supabaseInvoices.map(convertSupabaseToLocal)
     : invoices;
+  
+  // Filter by client if selected
+  const displayInvoices = filterClient 
+    ? allInvoices.filter(invoice => 
+        invoice.clientName.toLowerCase().includes(filterClient.name.toLowerCase()) ||
+        (supabaseInvoices.find(si => si.number === invoice.number)?.client_id === filterClient.id)
+      )
+    : allInvoices;
 
   if (loading) {
     return (
@@ -374,6 +385,20 @@ ${selectedData.map(data => `  <invoice>
         </CardContent>
       </Card>
 
+      {/* Filtres */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtres</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ClientFilter 
+            selectedClient={filterClient}
+            onClientSelect={setFilterClient}
+            placeholder="Tous les clients"
+          />
+        </CardContent>
+      </Card>
+
       {/* Liste des factures */}
       <Card>
         <CardHeader>
@@ -381,7 +406,7 @@ ${selectedData.map(data => `  <invoice>
             📋 Liste des factures
           </CardTitle>
           <CardDescription>
-            Gérez et consultez toutes vos factures
+            Gérez et consultez toutes vos factures {filterClient && `pour ${filterClient.name}`}
           </CardDescription>
         </CardHeader>
         <CardContent>

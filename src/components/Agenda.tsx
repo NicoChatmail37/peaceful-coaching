@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, Clock, Users } from "lucide-react";
-import { useAppointments } from "@/hooks/useAppointments";
+import { Plus, Calendar, Clock, Users, CalendarDays } from "lucide-react";
+import { useAppointments, AppointmentWithClient } from "@/hooks/useAppointments";
 import { useUIPresets } from "@/hooks/useUIPresets";
+import { useSelectedClient } from "@/contexts/SelectedClientContext";
+import { useClients } from "@/hooks/useClients";
 import { AgendaCalendar } from "./agenda/AgendaCalendar";
 import { MonthlyCalendar } from "./agenda/MonthlyCalendar";
 import { DailyAppointmentsList } from "./agenda/DailyAppointmentsList";
@@ -21,6 +23,16 @@ export const Agenda = ({ onOpenPatientTab }: AgendaProps) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { getLabel } = useUIPresets();
+  const { setSelectedClient } = useSelectedClient();
+  const { clients } = useClients();
+
+  const handleSelectAppointment = (appointment: AppointmentWithClient) => {
+    const client = clients.find(c => c.id === appointment.client_id);
+    if (client) {
+      setSelectedClient(client);
+      onOpenPatientTab?.();
+    }
+  };
 
   // Calculer les dates de début et fin selon la vue
   const getDateRange = () => {
@@ -68,10 +80,19 @@ export const Agenda = ({ onOpenPatientTab }: AgendaProps) => {
           </p>
         </div>
         
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouveau rendez-vous
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setSelectedDate(new Date())}
+          >
+            <CalendarDays className="h-4 w-4 mr-2" />
+            Aujourd'hui
+          </Button>
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nouveau rendez-vous
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="calendar" className="space-y-6">
@@ -167,6 +188,7 @@ export const Agenda = ({ onOpenPatientTab }: AgendaProps) => {
               <AppointmentsList
                 appointments={appointments}
                 loading={loading}
+                onSelectAppointment={handleSelectAppointment}
               />
             </CardContent>
           </Card>
