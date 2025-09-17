@@ -16,10 +16,21 @@ import {
   Trash2,
   Clock,
   Database,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import { AudioRecorder } from "./AudioRecorder";
-import { transcribeAudio, getModelInfo, WhisperModel } from "@/lib/whisperService";
+import { 
+  transcribeAudio, 
+  getModelInfo, 
+  getAvailableModels,
+  getBridgeStatus,
+  WhisperModel,
+  TranscriptionMode,
+  BridgeStatus 
+} from "@/lib/whisperService";
 import { storeAudioBlob, storeTranscriptResult, getTranscriptsBySession, deleteAudioAndTranscripts } from "@/lib/transcriptionStorage";
 import { toast } from "@/hooks/use-toast";
 
@@ -37,6 +48,7 @@ export const TranscriptionPanel = ({
   disabled = false
 }: TranscriptionPanelProps) => {
   const [selectedModel, setSelectedModel] = useState<WhisperModel>('tiny');
+  const [selectedMode, setSelectedMode] = useState<TranscriptionMode>('auto');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentAudio, setCurrentAudio] = useState<Blob | null>(null);
@@ -44,12 +56,28 @@ export const TranscriptionPanel = ({
   const [currentSegments, setCurrentSegments] = useState<any[]>([]);
   const [currentSrt, setCurrentSrt] = useState<string>('');
   const [savedTranscripts, setSavedTranscripts] = useState<any[]>([]);
+  const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
+  const [checkingBridge, setCheckingBridge] = useState(false);
 
   const modelInfo = getModelInfo(selectedModel);
+  const availableModels = getAvailableModels(!!bridgeStatus);
 
   useEffect(() => {
     loadSavedTranscripts();
+    checkBridgeStatus();
   }, [sessionId]);
+
+  const checkBridgeStatus = async () => {
+    setCheckingBridge(true);
+    try {
+      const status = await getBridgeStatus();
+      setBridgeStatus(status);
+    } catch (error) {
+      setBridgeStatus(null);
+    } finally {
+      setCheckingBridge(false);
+    }
+  };
 
   const loadSavedTranscripts = async () => {
     try {
@@ -90,6 +118,7 @@ export const TranscriptionPanel = ({
       const result = await transcribeAudio(currentAudio, {
         model: selectedModel,
         language: 'fr',
+        mode: selectedMode,
         onProgress: setProgress
       });
 
@@ -194,34 +223,86 @@ export const TranscriptionPanel = ({
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">Transcription Audio</h3>
-          <Badge variant="outline" className="flex items-center gap-1">
-            <Database className="h-3 w-3" />
-            Local uniquement
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge 
+              variant={bridgeStatus ? "default" : "outline"} 
+              className="flex items-center gap-1"
+            >
+              {bridgeStatus ? (
+                <>
+                  <Zap className="h-3 w-3" />
+                  Bridge Pro {bridgeStatus.device.toUpperCase()}
+                </>
+              ) : (
+                <>
+                  <Database className="h-3 w-3" />
+                  Mode Léger
+                </>
+              )}
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={checkBridgeStatus}
+              disabled={checkingBridge}
+              className="h-6 px-2"
+            >
+              {bridgeStatus ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            </Button>
+          </div>
         </div>
 
-        {/* Model Selection */}
-        <div className="space-y-2">
-          <Label className="text-sm">Modèle Whisper</Label>
-          <Select value={selectedModel} onValueChange={(value) => setSelectedModel(value as WhisperModel)}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tiny">
-                Tiny ({modelInfo.sizeMB}Mo) - {getModelInfo('tiny').description}
-              </SelectItem>
-              <SelectItem value="base">
-                Base ({getModelInfo('base').sizeMB}Mo) - {getModelInfo('base').description}
-              </SelectItem>
-              <SelectItem value="small">
-                Small ({getModelInfo('small').sizeMB}Mo) - {getModelInfo('small').description}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            {modelInfo.description}
-          </p>
+        {/* Mode Selection */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="space-y-2">
+            <Label className="text-sm">Mode</Label>
+            <Select value={selectedMode} onValueChange={(value) => setSelectedMode(value as TranscriptionMode)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto</SelectItem>
+                <SelectItem value="browser">Navigateur</SelectItem>
+                <SelectItem value="bridge" disabled={!bridgeStatus}>
+                  Bridge {!bridgeStatus && "(non disponible)"}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Modèle Whisper</Label>
+            <Select value={selectedModel} onValueChange={(value) => setSelectedModel(value as WhisperModel)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableModels.map((model) => {
+                  const info = getModelInfo(model);
+                  return (
+                    <SelectItem 
+                      key={model} 
+                      value={model}
+                      disabled={info.requiresBridge && !bridgeStatus}
+                    >
+                      {model.charAt(0).toUpperCase() + model.slice(1)} ({info.sizeMB}Mo)
+                      {info.requiresBridge && !bridgeStatus && " - Bridge requis"}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p><strong>{modelInfo.description}</strong></p>
+          {modelInfo.requiresBridge && !bridgeStatus && (
+            <p className="text-destructive">⚠️ Ce modèle nécessite le bridge local</p>
+          )}
+          {bridgeStatus && (
+            <p className="text-emerald-600">✓ Bridge connecté - GPU {bridgeStatus.device.toUpperCase()} disponible</p>
+          )}
         </div>
       </div>
 
