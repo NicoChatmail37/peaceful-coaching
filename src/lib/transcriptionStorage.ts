@@ -38,6 +38,16 @@ export interface TranscriptNote {
   created_at: string;
 }
 
+export interface AINote {
+  id: string;
+  transcript_id: string;
+  type: 'summary' | 'todos' | 'notes' | 'custom';
+  prompt: string;
+  result: string;
+  model: string;
+  created_at: string;
+}
+
 interface TranscriptionDB extends DBSchema {
   audio_blobs: {
     key: string;
@@ -53,6 +63,11 @@ interface TranscriptionDB extends DBSchema {
     value: TranscriptNote;
     indexes: { 'by-transcript': string };
   };
+  ai_notes: {
+    key: string;
+    value: AINote;
+    indexes: { 'by-transcript': string };
+  };
   prefs: {
     key: string;
     value: any;
@@ -64,21 +79,35 @@ let dbInstance: IDBPDatabase<TranscriptionDB> | null = null;
 export async function getTranscriptionDB() {
   if (dbInstance) return dbInstance;
 
-  dbInstance = await openDB<TranscriptionDB>('transcription-db', 1, {
-    upgrade(db) {
+  dbInstance = await openDB<TranscriptionDB>('transcription-db', 2, {
+    upgrade(db, oldVersion) {
       // Audio blobs store
-      db.createObjectStore('audio_blobs', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('audio_blobs')) {
+        db.createObjectStore('audio_blobs', { keyPath: 'id' });
+      }
 
       // Transcripts store
-      const transcriptsStore = db.createObjectStore('transcripts', { keyPath: 'id' });
-      transcriptsStore.createIndex('by-audio', 'audio_id');
+      if (!db.objectStoreNames.contains('transcripts')) {
+        const transcriptsStore = db.createObjectStore('transcripts', { keyPath: 'id' });
+        transcriptsStore.createIndex('by-audio', 'audio_id');
+      }
 
       // Notes store
-      const notesStore = db.createObjectStore('notes', { keyPath: 'id' });
-      notesStore.createIndex('by-transcript', 'transcript_id');
+      if (!db.objectStoreNames.contains('notes')) {
+        const notesStore = db.createObjectStore('notes', { keyPath: 'id' });
+        notesStore.createIndex('by-transcript', 'transcript_id');
+      }
+
+      // AI Notes store (nouveau dans version 2)
+      if (!db.objectStoreNames.contains('ai_notes')) {
+        const aiNotesStore = db.createObjectStore('ai_notes', { keyPath: 'id' });
+        aiNotesStore.createIndex('by-transcript', 'transcript_id');
+      }
 
       // Preferences store
-      db.createObjectStore('prefs', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('prefs')) {
+        db.createObjectStore('prefs', { keyPath: 'key' });
+      }
     },
   });
 
@@ -153,12 +182,12 @@ export async function getTranscriptsBySession(sessionId: string): Promise<(Trans
 
 export async function deleteAudioAndTranscripts(audioId: string): Promise<void> {
   const db = await getTranscriptionDB();
-  const tx = db.transaction(['audio_blobs', 'transcripts', 'notes'], 'readwrite');
+  const tx = db.transaction(['audio_blobs', 'transcripts', 'notes', 'ai_notes'], 'readwrite');
   
   // Delete audio
   await tx.objectStore('audio_blobs').delete(audioId);
   
-  // Delete associated transcripts and notes
+  // Delete associated transcripts, notes, and AI notes
   const transcripts = await tx.objectStore('transcripts').index('by-audio').getAll(audioId);
   for (const transcript of transcripts) {
     await tx.objectStore('transcripts').delete(transcript.id);
@@ -168,7 +197,49 @@ export async function deleteAudioAndTranscripts(audioId: string): Promise<void> 
     for (const note of notes) {
       await tx.objectStore('notes').delete(note.id);
     }
+    
+    // Delete associated AI notes
+    const aiNotes = await tx.objectStore('ai_notes').index('by-transcript').getAll(transcript.id);
+    for (const aiNote of aiNotes) {
+      await tx.objectStore('ai_notes').delete(aiNote.id);
+    }
   }
   
   await tx.done;
+}
+
+// === AI Notes Management ===
+
+export async function storeAINote(note: Omit<AINote, 'id' | 'created_at'>): Promise<string> {
+  const db = await getTranscriptionDB();
+  const id = `ai_note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  const aiNote: AINote = {
+    ...note,
+    id,
+    created_at: new Date().toISOString(),
+  };
+
+  await db.add('ai_notes', aiNote);
+  return id;
+}
+
+export async function getAINotesByTranscript(transcriptId: string): Promise<AINote[]> {
+  const db = await getTranscriptionDB();
+  return await db.getAllFromIndex('ai_notes', 'by-transcript', transcriptId);
+}
+
+export async function deleteAINote(id: string): Promise<void> {
+  const db = await getTranscriptionDB();
+  await db.delete('ai_notes', id);
+}
+
+export async function updateAINote(id: string, updates: Partial<Omit<AINote, 'id' | 'created_at'>>): Promise<void> {
+  const db = await getTranscriptionDB();
+  const existing = await db.get('ai_notes', id);
+  
+  if (existing) {
+    const updated = { ...existing, ...updates };
+    await db.put('ai_notes', updated);
+  }
 }

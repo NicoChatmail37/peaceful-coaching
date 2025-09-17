@@ -84,6 +84,70 @@ Transcrit un fichier audio.
 ### GET /models
 Liste les modèles disponibles en local.
 
+---
+
+## 🧠 LLM Integration (Nouveau)
+
+Le bridge supporte maintenant l'intégration LLM locale pour générer des résumés et analyses :
+
+### Configuration LLM
+
+Le bridge peut maintenant proxy les requêtes LLM vers Ollama ou LM Studio :
+
+```json
+{
+  "llm": {
+    "enabled": true,
+    "backend": "ollama",
+    "ollama_url": "http://localhost:11434",
+    "lmstudio_url": "http://localhost:1234",
+    "default_model": "llama3.1:8b",
+    "timeout": 30000
+  }
+}
+```
+
+### Endpoints LLM
+
+#### `GET /status`
+Retourne maintenant aussi le statut LLM :
+```json
+{
+  "ok": true,
+  "transcription": { "device": "cpu", "models": ["tiny", "small"] },
+  "llm": {
+    "ok": true,
+    "backend": "ollama",
+    "available_models": ["llama3.1:8b", "codellama:7b"],
+    "default_model": "llama3.1:8b"
+  }
+}
+```
+
+#### `POST /v1/chat/completions`
+Proxy vers Ollama/LM Studio avec format OpenAI :
+```bash
+curl -X POST http://localhost:27123/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "llama3.1:8b",
+    "messages": [
+      {"role": "system", "content": "Tu es un assistant médical."},
+      {"role": "user", "content": "Résume cette consultation..."}
+    ],
+    "temperature": 0.3,
+    "stream": true
+  }'
+```
+
+### Variables d'environnement LLM
+
+- `LLM_BACKEND=ollama|lmstudio|off` : Backend LLM à utiliser
+- `OLLAMA_URL=http://localhost:11434` : URL d'Ollama
+- `LMSTUDIO_URL=http://localhost:1234` : URL de LM Studio
+
+---
+
 ## Configuration
 
 Le bridge utilise un fichier `config.json` :

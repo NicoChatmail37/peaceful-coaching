@@ -19,7 +19,11 @@ import {
   AlertCircle,
   Zap,
   Wifi,
-  WifiOff
+  WifiOff,
+  Brain,
+  ListTodo,
+  FileTextIcon,
+  Sparkles
 } from "lucide-react";
 import { AudioRecorder } from "./AudioRecorder";
 import { 
@@ -31,7 +35,22 @@ import {
   TranscriptionMode,
   BridgeStatus 
 } from "@/lib/whisperService";
-import { storeAudioBlob, storeTranscriptResult, getTranscriptsBySession, deleteAudioAndTranscripts } from "@/lib/transcriptionStorage";
+import { 
+  storeAudioBlob, 
+  storeTranscriptResult, 
+  getTranscriptsBySession, 
+  deleteAudioAndTranscripts,
+  storeAINote,
+  getAINotesByTranscript,
+  AINote
+} from "@/lib/transcriptionStorage";
+import { 
+  generateSummary, 
+  extractTodos, 
+  generateNotes, 
+  getLLMBridgeStatus,
+  LLMBridgeStatus
+} from "@/lib/llmService";
 import { toast } from "@/hooks/use-toast";
 
 interface TranscriptionPanelProps {
@@ -58,6 +77,14 @@ export const TranscriptionPanel = ({
   const [savedTranscripts, setSavedTranscripts] = useState<any[]>([]);
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
   const [checkingBridge, setCheckingBridge] = useState(false);
+  
+  // LLM related state
+  const [llmBridgeStatus, setLlmBridgeStatus] = useState<LLMBridgeStatus | null>(null);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiResult, setAiResult] = useState<string>('');
+  const [aiStreamContent, setAiStreamContent] = useState<string>('');
+  const [currentAINotes, setCurrentAINotes] = useState<AINote[]>([]);
+  const [selectedAIType, setSelectedAIType] = useState<'summary' | 'todos' | 'notes'>('summary');
 
   const modelInfo = getModelInfo(selectedModel);
   const availableModels = getAvailableModels(!!bridgeStatus);
@@ -65,7 +92,14 @@ export const TranscriptionPanel = ({
   useEffect(() => {
     loadSavedTranscripts();
     checkBridgeStatus();
+    checkLLMBridgeStatus();
   }, [sessionId]);
+
+  useEffect(() => {
+    if (currentTranscript) {
+      loadAINotes();
+    }
+  }, [currentTranscript]);
 
   const checkBridgeStatus = async () => {
     setCheckingBridge(true);
@@ -76,6 +110,30 @@ export const TranscriptionPanel = ({
       setBridgeStatus(null);
     } finally {
       setCheckingBridge(false);
+    }
+  };
+
+  const checkLLMBridgeStatus = async () => {
+    try {
+      const status = await getLLMBridgeStatus();
+      setLlmBridgeStatus(status);
+    } catch (error) {
+      setLlmBridgeStatus(null);
+    }
+  };
+
+  const loadAINotes = async () => {
+    if (!savedTranscripts.length) return;
+    
+    try {
+      // Get AI notes for the current transcript
+      const currentSavedTranscript = savedTranscripts.find(t => t.text === currentTranscript);
+      if (currentSavedTranscript) {
+        const aiNotes = await getAINotesByTranscript(currentSavedTranscript.id);
+        setCurrentAINotes(aiNotes);
+      }
+    } catch (error) {
+      console.error('Error loading AI notes:', error);
     }
   };
 
@@ -218,6 +276,87 @@ export const TranscriptionPanel = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleGenerateAI = async () => {
+    if (!currentTranscript.trim()) {
+      toast({
+        title: "Aucun transcript",
+        description: "Veuillez d'abord transcrire un audio",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!llmBridgeStatus?.ok) {
+      toast({
+        title: "LLM non disponible",
+        description: "Veuillez démarrer Ollama ou LM Studio",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    setAiResult('');
+    setAiStreamContent('');
+
+    try {
+      let result = '';
+      
+      const onProgress = (chunk: string) => {
+        setAiStreamContent(prev => prev + chunk);
+      };
+
+      if (selectedAIType === 'summary') {
+        result = await generateSummary(currentTranscript, { onProgress });
+      } else if (selectedAIType === 'todos') {
+        result = await extractTodos(currentTranscript, { onProgress });
+      } else if (selectedAIType === 'notes') {
+        result = await generateNotes(currentTranscript, { onProgress });
+      }
+
+      setAiResult(result);
+
+      // Save AI note to IndexedDB
+      const currentSavedTranscript = savedTranscripts.find(t => t.text === currentTranscript);
+      if (currentSavedTranscript) {
+        await storeAINote({
+          transcript_id: currentSavedTranscript.id,
+          type: selectedAIType,
+          prompt: `Generated ${selectedAIType}`,
+          result,
+          model: llmBridgeStatus.default_model
+        });
+        await loadAINotes();
+      }
+
+      toast({
+        title: "Analyse terminée",
+        description: `${selectedAIType === 'summary' ? 'Résumé' : selectedAIType === 'todos' ? 'Actions' : 'Notes'} générée avec succès`
+      });
+
+    } catch (error) {
+      console.error('AI generation error:', error);
+      toast({
+        title: "Erreur d'analyse",
+        description: error instanceof Error ? error.message : 'Une erreur est survenue',
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingAI(false);
+      setAiStreamContent('');
+    }
+  };
+
+  const handleUseAIResult = () => {
+    if (aiResult.trim()) {
+      onTranscriptReady(aiResult);
+      toast({
+        title: "Analyse appliquée",
+        description: "Le résultat d'analyse a été copié dans la séance"
+      });
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="p-4 border-b">
@@ -240,10 +379,29 @@ export const TranscriptionPanel = ({
                 </>
               )}
             </Badge>
+            <Badge 
+              variant={llmBridgeStatus?.ok ? "default" : "outline"} 
+              className="flex items-center gap-1"
+            >
+              {llmBridgeStatus?.ok ? (
+                <>
+                  <Brain className="h-3 w-3" />
+                  LLM {llmBridgeStatus.backend?.toUpperCase()}
+                </>
+              ) : (
+                <>
+                  <Brain className="h-3 w-3 opacity-50" />
+                  LLM Off
+                </>
+              )}
+            </Badge>
             <Button
               size="sm"
               variant="ghost"
-              onClick={checkBridgeStatus}
+              onClick={() => {
+                checkBridgeStatus();
+                checkLLMBridgeStatus();
+              }}
               disabled={checkingBridge}
               className="h-6 px-2"
             >
@@ -303,6 +461,10 @@ export const TranscriptionPanel = ({
           {bridgeStatus && (
             <p className="text-emerald-600">✓ Bridge connecté - GPU {bridgeStatus.device.toUpperCase()} disponible</p>
           )}
+          {llmBridgeStatus?.ok && (
+            <p className="text-blue-600">✓ LLM Local connecté ({llmBridgeStatus.backend}) - Analyse IA disponible</p>
+          )}
+          <p className="text-muted-foreground">🔒 Tout reste local — aucune donnée n'est envoyée au cloud</p>
         </div>
       </div>
 
@@ -391,6 +553,131 @@ export const TranscriptionPanel = ({
                   >
                     Utiliser dans la séance
                   </Button>
+                </Card>
+
+                {/* IA Locale Section */}
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="flex items-center gap-2">
+                      <Brain className="h-4 w-4" />
+                      IA Locale
+                    </Label>
+                    <Badge variant={llmBridgeStatus?.ok ? "default" : "secondary"}>
+                      {llmBridgeStatus?.ok ? "Connecté ✓" : "Non disponible"}
+                    </Badge>
+                  </div>
+
+                  {llmBridgeStatus?.ok ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          size="sm"
+                          variant={selectedAIType === 'summary' ? "default" : "outline"}
+                          onClick={() => setSelectedAIType('summary')}
+                          className="flex items-center gap-1"
+                        >
+                          <FileTextIcon className="h-3 w-3" />
+                          Résumé
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={selectedAIType === 'todos' ? "default" : "outline"}
+                          onClick={() => setSelectedAIType('todos')}
+                          className="flex items-center gap-1"
+                        >
+                          <ListTodo className="h-3 w-3" />
+                          Actions
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={selectedAIType === 'notes' ? "default" : "outline"}
+                          onClick={() => setSelectedAIType('notes')}
+                          className="flex items-center gap-1"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          Notes
+                        </Button>
+                      </div>
+
+                      <Button
+                        onClick={handleGenerateAI}
+                        disabled={isGeneratingAI || !currentTranscript.trim()}
+                        className="w-full"
+                      >
+                        <Brain className="h-4 w-4 mr-2" />
+                        {isGeneratingAI ? 'Analyse en cours...' : `Générer ${selectedAIType === 'summary' ? 'Résumé' : selectedAIType === 'todos' ? 'Actions' : 'Notes'}`}
+                      </Button>
+
+                      {(isGeneratingAI && aiStreamContent) && (
+                        <Card className="p-3 bg-muted/50">
+                          <div className="text-sm whitespace-pre-wrap">{aiStreamContent}</div>
+                        </Card>
+                      )}
+
+                      {aiResult && (
+                        <Card className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="text-sm font-medium">
+                              {selectedAIType === 'summary' ? 'Résumé' : selectedAIType === 'todos' ? 'Actions/TODO' : 'Notes structurées'}
+                            </Label>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCopyToClipboard(aiResult)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownload(aiResult, `${selectedAIType}.txt`)}
+                              >
+                                <Download className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded border">
+                            {aiResult}
+                          </div>
+                          <Button
+                            onClick={handleUseAIResult}
+                            className="mt-2 w-full"
+                            size="sm"
+                          >
+                            Utiliser cette analyse dans la séance
+                          </Button>
+                        </Card>
+                      )}
+
+                      {currentAINotes.length > 0 && (
+                        <Card className="p-4">
+                          <Label className="text-sm font-medium mb-2 block">Analyses précédentes</Label>
+                          <div className="space-y-2 max-h-32 overflow-y-auto">
+                            {currentAINotes.map((note) => (
+                              <div key={note.id} className="text-xs p-2 bg-muted/30 rounded">
+                                <div className="flex items-center justify-between mb-1">
+                                  <Badge variant="outline" className="text-xs">
+                                    {note.type}
+                                  </Badge>
+                                  <span className="text-muted-foreground">
+                                    {new Date(note.created_at).toLocaleString('fr-FR')}
+                                  </span>
+                                </div>
+                                <p className="line-clamp-2">{note.result}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </Card>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground py-4">
+                      <Brain className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Bridge LLM non détecté</p>
+                      <p className="text-xs">Démarrez Ollama ou LM Studio pour activer l'IA locale</p>
+                    </div>
+                  )}
                 </Card>
 
                 {currentSegments.length > 0 && (
