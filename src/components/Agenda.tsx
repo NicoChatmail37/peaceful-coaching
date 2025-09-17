@@ -6,6 +6,8 @@ import { Plus, Calendar, Clock, Users } from "lucide-react";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useUIPresets } from "@/hooks/useUIPresets";
 import { AgendaCalendar } from "./agenda/AgendaCalendar";
+import { MonthlyCalendar } from "./agenda/MonthlyCalendar";
+import { DailyAppointmentsList } from "./agenda/DailyAppointmentsList";
 import { AppointmentsList } from "./agenda/AppointmentsList";
 import { UninvoicedAppointments } from "./agenda/UninvoicedAppointments";
 import { AppointmentDialog } from "./agenda/AppointmentDialog";
@@ -85,10 +87,42 @@ export const Agenda = () => {
         </TabsList>
 
         <TabsContent value="calendar" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Colonne gauche - Calendrier mensuel */}
+            <div className="lg:col-span-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Calendrier mensuel</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <MonthlyCalendar
+                    selectedDate={selectedDate}
+                    onDateChange={setSelectedDate}
+                    appointments={appointments}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Colonne droite - Rendez-vous du jour */}
+            <div className="lg:col-span-4">
+              <Card className="h-full">
+                <CardContent className="p-4">
+                  <DailyAppointmentsList
+                    selectedDate={selectedDate}
+                    appointments={appointments}
+                    onNewAppointment={() => setIsDialogOpen(true)}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Vue semaine et jour comme avant */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Vue calendrier</CardTitle>
+                <CardTitle>Vue détaillée</CardTitle>
                 <div className="flex gap-2">
                   <Button
                     variant={currentView === 'day' ? 'default' : 'outline'}
@@ -103,13 +137,6 @@ export const Agenda = () => {
                     onClick={() => setCurrentView('week')}
                   >
                     Semaine
-                  </Button>
-                  <Button
-                    variant={currentView === 'month' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setCurrentView('month')}
-                  >
-                    Mois
                   </Button>
                 </div>
               </div>

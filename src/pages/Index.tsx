@@ -39,7 +39,7 @@ export interface InvoiceItem {
 
 
 const Index = () => {
-  const [currentTab, setCurrentTab] = useState("patients");
+  const [currentTab, setCurrentTab] = useState("agenda");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const { invoices: supabaseInvoices } = useInvoices();
@@ -71,13 +71,13 @@ const Index = () => {
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1">
-            <TabsTrigger value="patients" className="flex items-center gap-2">
-              <span className="text-lg">👥</span>
-              Clients & Séances
-            </TabsTrigger>
             <TabsTrigger value="agenda" className="flex items-center gap-2">
               <span className="text-lg">📅</span>
               Agenda
+            </TabsTrigger>
+            <TabsTrigger value="patients" className="flex items-center gap-2">
+              <span className="text-lg">👥</span>
+              Clients & Séances
             </TabsTrigger>
             <TabsTrigger value="create" className="flex items-center gap-2">
               <span className="text-lg">📄</span>
@@ -101,12 +101,12 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="patients" className="space-y-6">
-            <PatientsAndSessions />
-          </TabsContent>
-
           <TabsContent value="agenda" className="space-y-6">
             <Agenda />
+          </TabsContent>
+
+          <TabsContent value="patients" className="space-y-6">
+            <PatientsAndSessions />
           </TabsContent>
 
           <TabsContent value="create" className="space-y-6">

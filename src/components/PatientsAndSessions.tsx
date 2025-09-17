@@ -4,15 +4,19 @@ import { Separator } from "@/components/ui/separator";
 import { PatientsPanel } from "./patients/PatientsPanel";
 import { TimelinePanel } from "./patients/TimelinePanel";
 import { SessionWorkspace } from "./patients/SessionWorkspace";
+import { AppointmentDialogForPatient } from "./patients/AppointmentDialogForPatient";
 import { usePatients } from "@/hooks/usePatients";
 import { useSessions } from "@/hooks/useSessions";
 import { useUIPresets } from "@/hooks/useUIPresets";
 import { Client } from "@/hooks/useClients";
 import { Session } from "@/hooks/useSessions";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "lucide-react";
 
 export const PatientsAndSessions = () => {
   const [selectedPatient, setSelectedPatient] = useState<Client | null>(null);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   const { patients, loading: patientsLoading } = usePatients();
   const { sessions, loading: sessionsLoading } = useSessions(selectedPatient?.id);
   const { getLabel } = useUIPresets();
@@ -80,9 +84,22 @@ export const PatientsAndSessions = () => {
       <div className="lg:col-span-5">
         <Card className="h-full">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-2xl">✏️</span>
-              {getLabel('sessionLabel', 'Séance')} active
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">✏️</span>
+                {getLabel('sessionLabel', 'Séance')} active
+              </div>
+              {selectedPatient && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAppointmentDialogOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Nouveau RDV
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -111,6 +128,14 @@ export const PatientsAndSessions = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog pour nouveau rendez-vous */}
+      <AppointmentDialogForPatient
+        open={isAppointmentDialogOpen}
+        onOpenChange={setIsAppointmentDialogOpen}
+        patient={selectedPatient}
+        onSuccess={() => setIsAppointmentDialogOpen(false)}
+      />
     </div>
   );
 };
