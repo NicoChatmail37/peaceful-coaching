@@ -5,6 +5,7 @@ import { InvoicePreview } from "@/components/InvoicePreview";
 import { InvoiceList } from "@/components/InvoiceList";
 import { CompanySettings } from "@/components/CompanySettings";
 import { CompanyManagement } from "@/components/CompanyManagement";
+import { LLMSettings } from "@/components/LLMSettings";
 import { PatientsAndSessions } from "@/components/PatientsAndSessions";
 import { Agenda } from "@/components/Agenda";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -153,6 +154,8 @@ const Index = () => {
             <CompanyManagement />
             <Separator />
             <CompanySettings />
+            <Separator />
+            <LLMSettings />
           </TabsContent>
         </Tabs>
       </main>

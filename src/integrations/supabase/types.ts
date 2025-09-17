@@ -378,6 +378,51 @@ export type Database = {
         }
         Relationships: []
       }
+      allowances_profiles: {
+        Row: {
+          company_id: string
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          holiday_pct: number
+          id: string
+          name: string
+          notes: string | null
+          thirteenth_pct: number
+          updated_at: string
+          user_id: string
+          vacation_pct: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          holiday_pct?: number
+          id?: string
+          name: string
+          notes?: string | null
+          thirteenth_pct?: number
+          updated_at?: string
+          user_id: string
+          vacation_pct?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          holiday_pct?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          thirteenth_pct?: number
+          updated_at?: string
+          user_id?: string
+          vacation_pct?: number
+        }
+        Relationships: []
+      }
       annual_certificates: {
         Row: {
           certificate_year: number
@@ -556,6 +601,7 @@ export type Database = {
           id: string
           processed_at: string | null
           processing_status: string | null
+          scanned_by_user_id: string | null
           status: string
           updated_at: string
           user_id: string
@@ -574,6 +620,7 @@ export type Database = {
           id?: string
           processed_at?: string | null
           processing_status?: string | null
+          scanned_by_user_id?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -592,6 +639,7 @@ export type Database = {
           id?: string
           processed_at?: string | null
           processing_status?: string | null
+          scanned_by_user_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string
@@ -647,8 +695,10 @@ export type Database = {
       employees: {
         Row: {
           address: string | null
+          allowances_profile_id: string | null
           avs_number: string | null
           birth_date: string | null
+          canton: string | null
           city: string | null
           company_id: string
           created_at: string
@@ -656,6 +706,7 @@ export type Database = {
           employment_type: string
           end_date: string | null
           first_name: string
+          holiday_pct_override: number | null
           hourly_rate_default: number | null
           id: string
           insurance_config_id: string | null
@@ -665,17 +716,22 @@ export type Database = {
           monthly_base: number | null
           nationality: string | null
           npa: string | null
+          pay_type: string
           start_date: string | null
           thirteenth_enabled: boolean | null
+          thirteenth_pct_override: number | null
           updated_at: string
           user_id: string
+          vacation_pct_override: number | null
           weekly_hours_target: number | null
           work_rate_pct: number | null
         }
         Insert: {
           address?: string | null
+          allowances_profile_id?: string | null
           avs_number?: string | null
           birth_date?: string | null
+          canton?: string | null
           city?: string | null
           company_id: string
           created_at?: string
@@ -683,6 +739,7 @@ export type Database = {
           employment_type?: string
           end_date?: string | null
           first_name: string
+          holiday_pct_override?: number | null
           hourly_rate_default?: number | null
           id?: string
           insurance_config_id?: string | null
@@ -692,17 +749,22 @@ export type Database = {
           monthly_base?: number | null
           nationality?: string | null
           npa?: string | null
+          pay_type?: string
           start_date?: string | null
           thirteenth_enabled?: boolean | null
+          thirteenth_pct_override?: number | null
           updated_at?: string
           user_id: string
+          vacation_pct_override?: number | null
           weekly_hours_target?: number | null
           work_rate_pct?: number | null
         }
         Update: {
           address?: string | null
+          allowances_profile_id?: string | null
           avs_number?: string | null
           birth_date?: string | null
+          canton?: string | null
           city?: string | null
           company_id?: string
           created_at?: string
@@ -710,6 +772,7 @@ export type Database = {
           employment_type?: string
           end_date?: string | null
           first_name?: string
+          holiday_pct_override?: number | null
           hourly_rate_default?: number | null
           id?: string
           insurance_config_id?: string | null
@@ -719,14 +782,25 @@ export type Database = {
           monthly_base?: number | null
           nationality?: string | null
           npa?: string | null
+          pay_type?: string
           start_date?: string | null
           thirteenth_enabled?: boolean | null
+          thirteenth_pct_override?: number | null
           updated_at?: string
           user_id?: string
+          vacation_pct_override?: number | null
           weekly_hours_target?: number | null
           work_rate_pct?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "employees_allowances_profile_id_fkey"
+            columns: ["allowances_profile_id"]
+            isOneToOne: false
+            referencedRelation: "allowances_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       insurance_configs: {
         Row: {
@@ -1387,6 +1461,50 @@ export type Database = {
         }
         Relationships: []
       }
+      payslip_items: {
+        Row: {
+          amount: number
+          created_at: string
+          hours: number | null
+          id: string
+          kind: string
+          meta: Json | null
+          payrun_id: string
+          rate: number | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          hours?: number | null
+          id?: string
+          kind: string
+          meta?: Json | null
+          payrun_id: string
+          rate?: number | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          hours?: number | null
+          id?: string
+          kind?: string
+          meta?: Json | null
+          payrun_id?: string
+          rate?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payslip_items_payrun_id_fkey"
+            columns: ["payrun_id"]
+            isOneToOne: false
+            referencedRelation: "payruns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payslips: {
         Row: {
           created_at: string
@@ -1566,9 +1684,11 @@ export type Database = {
           created_at: string
           date: string
           employee_id: string
+          hourly_rate_override: number | null
           hourly_rate_snapshot: number
           hours: number
           id: string
+          multiplier: number
           task_label: string | null
           updated_at: string
           user_id: string
@@ -1578,9 +1698,11 @@ export type Database = {
           created_at?: string
           date: string
           employee_id: string
+          hourly_rate_override?: number | null
           hourly_rate_snapshot?: number
           hours?: number
           id?: string
+          multiplier?: number
           task_label?: string | null
           updated_at?: string
           user_id: string
@@ -1590,9 +1712,11 @@ export type Database = {
           created_at?: string
           date?: string
           employee_id?: string
+          hourly_rate_override?: number | null
           hourly_rate_snapshot?: number
           hours?: number
           id?: string
+          multiplier?: number
           task_label?: string | null
           updated_at?: string
           user_id?: string
@@ -1823,9 +1947,21 @@ export type Database = {
         Args: { p_account_code: string; p_company_id: string }
         Returns: boolean
       }
+      compute_hourly_allowances: {
+        Args: {
+          p_employee_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       create_default_rates_for_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      create_session_direct: {
+        Args: { p_client_id: string; p_started_at?: string }
+        Returns: string
       }
       is_member_company: {
         Args: { c_id: string }

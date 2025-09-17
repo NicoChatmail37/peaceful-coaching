@@ -76,7 +76,7 @@ export const useSessions = (clientId?: string) => {
 
   const createSession = async (clientId: string, startedAt?: Date) => {
     try {
-      const { data, error } = await supabase.rpc('rpc_create_session', {
+      const { data, error } = await supabase.rpc('create_session_direct', {
         p_client_id: clientId,
         p_started_at: startedAt?.toISOString()
       });
