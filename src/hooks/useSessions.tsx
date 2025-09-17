@@ -63,9 +63,10 @@ export const useSessions = (clientId?: string) => {
       setSessions(sessionsWithClient);
     } catch (error) {
       console.error('Error fetching sessions:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       toast({
         title: "Erreur",
-        description: "Impossible de charger les séances",
+        description: `Impossible de charger les séances: ${errorMessage}`,
         variant: "destructive"
       });
     } finally {

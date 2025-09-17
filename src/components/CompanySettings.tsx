@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/hooks/useCompany";
-import { Building, Save, Mail, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Building, Save, Mail, AlertTriangle, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { 
   validateSwissIBAN, 
@@ -172,6 +173,65 @@ export const CompanySettings = () => {
       await updateCompany(activeCompany.id, formData);
     } catch (error) {
       console.error('Error updating company:', error);
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !activeCompany) return;
+
+    // Validate file
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "Fichier trop volumineux",
+        description: "La taille du logo ne doit pas dépasser 2MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Format invalide",
+        description: "Seuls les fichiers image sont acceptés",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${activeCompany.id}.${fileExt}`;
+      const filePath = `logos/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+
+      // Update company with logo URL
+      await updateCompany(activeCompany.id, { logo_url: publicUrl });
+
+      toast({
+        title: "Logo téléchargé",
+        description: "Le logo de votre entreprise a été mis à jour"
+      });
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast({
+        title: "Erreur de téléchargement",
+        description: "Impossible de télécharger le logo",
+        variant: "destructive"
+      });
     }
   };
 
@@ -345,6 +405,33 @@ export const CompanySettings = () => {
                 {validationErrors.tva_number}
               </p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="companyLogo">Logo de l'entreprise</Label>
+            <div className="flex items-center gap-4">
+              {activeCompany?.logo_url && (
+                <div className="flex-shrink-0">
+                  <img 
+                    src={activeCompany.logo_url} 
+                    alt="Logo entreprise" 
+                    className="w-16 h-16 object-contain border rounded"
+                  />
+                </div>
+              )}
+              <div className="flex-1">
+                <Input
+                  id="companyLogo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Formats acceptés: JPG, PNG. Max 2MB. Recommandé: 200x200px
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end">

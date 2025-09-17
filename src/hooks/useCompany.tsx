@@ -51,18 +51,31 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(false);
 
   const setActiveCompany = async (company: Company) => {
+    if (!user) return;
+    
     try {
       // Update all companies to set is_active = false
       await supabase
         .from('companies')
         .update({ is_active: false })
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       // Set the selected company as active
       await supabase
         .from('companies')
         .update({ is_active: true })
         .eq('id', company.id);
+
+      // Ensure membership exists for RLS policies
+      await supabase
+        .from('memberships')
+        .upsert({
+          company_id: company.id,
+          user_id: user.id,
+          role: 'owner'
+        }, {
+          onConflict: 'company_id,user_id'
+        });
 
       setActiveCompanyState(company);
       localStorage.setItem('activeCompanyId', company.id);
@@ -137,6 +150,17 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) throw error;
+
+      // Create membership for RLS policies
+      await supabase
+        .from('memberships')
+        .upsert({
+          company_id: data.id,
+          user_id: user.id,
+          role: 'owner'
+        }, {
+          onConflict: 'company_id,user_id'
+        });
 
       await refreshCompanies();
       

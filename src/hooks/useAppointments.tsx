@@ -64,9 +64,10 @@ export const useAppointments = (startDate?: Date, endDate?: Date) => {
       setAppointments(appointmentsWithClient);
     } catch (error) {
       console.error('Error fetching appointments:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       toast({
         title: "Erreur",
-        description: "Impossible de charger l'agenda",
+        description: `Impossible de charger les rendez-vous: ${errorMessage}`,
         variant: "destructive"
       });
     } finally {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { PatientsPanel } from "./patients/PatientsPanel";
@@ -8,18 +8,23 @@ import { AppointmentDialogForPatient } from "./patients/AppointmentDialogForPati
 import { usePatients } from "@/hooks/usePatients";
 import { useSessions } from "@/hooks/useSessions";
 import { useUIPresets } from "@/hooks/useUIPresets";
+import { useSelectedClient } from "@/contexts/SelectedClientContext";
 import { Client } from "@/hooks/useClients";
 import { Session } from "@/hooks/useSessions";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "lucide-react";
 
 export const PatientsAndSessions = () => {
-  const [selectedPatient, setSelectedPatient] = useState<Client | null>(null);
+  const { selectedClient, setSelectedClient } = useSelectedClient();
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   const { patients, loading: patientsLoading } = usePatients();
-  const { sessions, loading: sessionsLoading } = useSessions(selectedPatient?.id);
+  const { sessions, loading: sessionsLoading } = useSessions(selectedClient?.id);
   const { getLabel } = useUIPresets();
+
+  // Use selectedClient from context as selectedPatient (backward compatibility)
+  const selectedPatient = selectedClient;
+  const setSelectedPatient = setSelectedClient;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-200px)]">

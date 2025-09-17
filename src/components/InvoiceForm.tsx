@@ -30,6 +30,7 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
     clientAddress: "",
     clientNPA: "",
     clientCity: "",
+    clientId: "",
     notes: "",
     includeTva: false,
     paymentFormat: "qr" as "cash" | "card" | "qr"
@@ -194,6 +195,7 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
         clientAddress: "",
         clientNPA: "",
         clientCity: "",
+        clientId: "",
         notes: "",
         includeTva: false,
         paymentFormat: "qr" as "cash" | "card" | "qr"

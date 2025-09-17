@@ -9,12 +9,14 @@ interface DailyAppointmentsListProps {
   selectedDate: Date;
   appointments: AppointmentWithClient[];
   onNewAppointment: () => void;
+  onSelectAppointment?: (appointment: AppointmentWithClient) => void;
 }
 
-export const DailyAppointmentsList = ({
-  selectedDate,
-  appointments,
-  onNewAppointment
+export const DailyAppointmentsList = ({ 
+  selectedDate, 
+  appointments, 
+  onNewAppointment,
+  onSelectAppointment
 }: DailyAppointmentsListProps) => {
   const dayAppointments = appointments.filter(apt => 
     isSameDay(parseISO(apt.starts_at), selectedDate)

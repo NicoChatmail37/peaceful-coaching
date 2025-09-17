@@ -12,7 +12,11 @@ import { AppointmentsList } from "./agenda/AppointmentsList";
 import { UninvoicedAppointments } from "./agenda/UninvoicedAppointments";
 import { AppointmentDialog } from "./agenda/AppointmentDialog";
 
-export const Agenda = () => {
+interface AgendaProps {
+  onOpenPatientTab?: () => void;
+}
+
+export const Agenda = ({ onOpenPatientTab }: AgendaProps) => {
   const [currentView, setCurrentView] = useState<'month' | 'week' | 'day'>('week');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -108,11 +112,12 @@ export const Agenda = () => {
             <div className="lg:col-span-4">
               <Card className="h-full">
                 <CardContent className="p-4">
-                  <DailyAppointmentsList
-                    selectedDate={selectedDate}
-                    appointments={appointments}
-                    onNewAppointment={() => setIsDialogOpen(true)}
-                  />
+                    <DailyAppointmentsList 
+                      selectedDate={selectedDate}
+                      appointments={appointments}
+                      onNewAppointment={() => setIsDialogOpen(true)}
+                      onSelectAppointment={handleSelectAppointment}
+                    />
                 </CardContent>
               </Card>
             </div>

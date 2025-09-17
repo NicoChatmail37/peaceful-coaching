@@ -230,17 +230,30 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
           <CardContent className="p-12 space-y-8" style={{ minHeight: '297mm' }}>
             {/* En-tête */}
             <div className="mb-16 grid grid-cols-2 [grid-template-rows:auto_auto_auto] gap-x-4">
-              {/* Ligne 1 / Col 1 : Émetteur */}
+              {/* Ligne 1 / Col 1 : Émetteur avec logo */}
               <div className="col-start-1 row-start-1 space-y-1">
-                <h2 className="text-xl font-bold text-foreground uppercase">
-                  {activeCompany?.name}
-                </h2>
-                <div className="text-sm text-muted-foreground">
-                  <p>{activeCompany?.address}</p>
-                  <p>{activeCompany?.npa} {activeCompany?.city}</p>
-                  {activeCompany?.phone && <p>Tél: {activeCompany.phone}</p>}
-                  {activeCompany?.email && <p>{activeCompany.email}</p>}
-                  {activeCompany?.tva_number && <p>N° TVA: {activeCompany.tva_number}</p>}
+                <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-foreground uppercase">
+                      {activeCompany?.name}
+                    </h2>
+                    <div className="text-sm text-muted-foreground">
+                      <p>{activeCompany?.address}</p>
+                      <p>{activeCompany?.npa} {activeCompany?.city}</p>
+                      {activeCompany?.phone && <p>Tél: {activeCompany.phone}</p>}
+                      {activeCompany?.email && <p>{activeCompany.email}</p>}
+                      {activeCompany?.tva_number && <p>N° TVA: {activeCompany.tva_number}</p>}
+                    </div>
+                  </div>
+                  {activeCompany?.logo_url && (
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={activeCompany.logo_url} 
+                        alt="Logo entreprise" 
+                        className="w-20 h-20 object-contain"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

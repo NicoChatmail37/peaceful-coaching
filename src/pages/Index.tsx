@@ -102,7 +102,7 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="agenda" className="space-y-6">
-            <Agenda />
+            <Agenda onOpenPatientTab={() => setCurrentTab('patients')} />
           </TabsContent>
 
           <TabsContent value="patients" className="space-y-6">
