@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Save, 
   CheckCircle, 
@@ -14,7 +15,8 @@ import {
   Clock, 
   FileText, 
   StickyNote,
-  Info
+  Info,
+  Mic
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -22,6 +24,7 @@ import { Client } from "@/hooks/useClients";
 import { Session, useSessions } from "@/hooks/useSessions";
 import { useUIPresets } from "@/hooks/useUIPresets";
 import { CreateInvoiceDialog } from "./CreateInvoiceDialog";
+import { TranscriptionPanel } from "@/components/transcription/TranscriptionPanel";
 
 interface SessionWorkspaceProps {
   session: Session;
@@ -148,57 +151,83 @@ export const SessionWorkspace = ({
         )}
       </div>
 
-      {/* Workspace à 2 panneaux */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
-        {/* Panneau Transcript */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="flex items-center gap-2">
+      {/* Workspace avec onglets */}
+      <div className="flex-1">
+        <Tabs defaultValue="transcript" className="h-full flex flex-col">
+          <TabsList className="mx-4 mt-4">
+            <TabsTrigger value="transcript" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              {getFieldLabel('transcript', 'Transcript')}
-            </Label>
-            <Badge variant="outline" className="text-xs">
-              {wordCount} mots
-            </Badge>
-          </div>
-          
-          <Textarea
-            placeholder={`Collez ici le compte-rendu de la ${getLabel('sessionLabel', 'séance').toLowerCase()}...`}
-            value={transcriptText}
-            onChange={(e) => setTranscriptText(e.target.value)}
-            className="min-h-[300px] resize-none"
-            disabled={isFinalized}
-          />
-          
-          {!isFinalized && (
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Save className="h-3 w-3" />
-              Sauvegarde automatique (800ms après arrêt de saisie)
-            </p>
-          )}
-        </div>
+              Transcript & Notes
+            </TabsTrigger>
+            <TabsTrigger value="transcription" className="flex items-center gap-2">
+              <Mic className="h-4 w-4" />
+              Transcription Audio
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Panneau Notes */}
-        <div className="space-y-3">
-          <Label className="flex items-center gap-2">
-            <StickyNote className="h-4 w-4" />
-            {getFieldLabel('todo', 'Notes de suivi')}
-          </Label>
-          
-          <Textarea
-            placeholder={`Points clés, TODO, prochaine ${getLabel('sessionLabel', 'séance').toLowerCase()}...`}
-            value={notesText}
-            onChange={(e) => setNotesText(e.target.value)}
-            className="min-h-[300px] resize-none"
-            disabled={isFinalized}
-          />
+          <TabsContent value="transcript" className="flex-1 m-0">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 h-full">
+              {/* Panneau Transcript */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    {getFieldLabel('transcript', 'Transcript')}
+                  </Label>
+                  <Badge variant="outline" className="text-xs">
+                    {wordCount} mots
+                  </Badge>
+                </div>
+                
+                <Textarea
+                  placeholder={`Collez ici le compte-rendu de la ${getLabel('sessionLabel', 'séance').toLowerCase()}...`}
+                  value={transcriptText}
+                  onChange={(e) => setTranscriptText(e.target.value)}
+                  className="min-h-[300px] resize-none"
+                  disabled={isFinalized}
+                />
+                
+                {!isFinalized && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Save className="h-3 w-3" />
+                    Sauvegarde automatique (800ms après arrêt de saisie)
+                  </p>
+                )}
+              </div>
 
-          {!isFinalized && (
-            <p className="text-xs text-muted-foreground">
-              Ces notes apparaîtront en en-tête lors de la prochaine séance
-            </p>
-          )}
-        </div>
+              {/* Panneau Notes */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  <StickyNote className="h-4 w-4" />
+                  {getFieldLabel('todo', 'Notes de suivi')}
+                </Label>
+                
+                <Textarea
+                  placeholder={`Points clés, TODO, prochaine ${getLabel('sessionLabel', 'séance').toLowerCase()}...`}
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  className="min-h-[300px] resize-none"
+                  disabled={isFinalized}
+                />
+
+                {!isFinalized && (
+                  <p className="text-xs text-muted-foreground">
+                    Ces notes apparaîtront en en-tête lors de la prochaine séance
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="transcription" className="flex-1 m-0">
+            <TranscriptionPanel
+              sessionId={session.id}
+              clientId={patient.id}
+              onTranscriptReady={(text) => setTranscriptText(text)}
+              disabled={isFinalized}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Footer avec actions */}
