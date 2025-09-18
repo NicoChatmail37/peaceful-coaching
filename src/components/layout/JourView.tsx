@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { TopBanner } from "./TopBanner";
 import { ChildTabs } from "./ChildTabs";
 
 export const JourView = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const clientId = searchParams.get('clientId');
   const childTab = searchParams.get('childTab') || 'sessions';
 
@@ -21,11 +23,13 @@ export const JourView = () => {
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-152px)]">
-      {/* Bandeau fixe en haut - 2 zones */}
-      <div className="h-32 border-b border-border bg-card">
+      {/* Bandeau fixe en haut - 3 zones */}
+      <div className="h-48 border-b border-border bg-card">
         <TopBanner 
           selectedClientId={clientId}
           onClientSelect={handleClientSelect}
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
         />
       </div>
 

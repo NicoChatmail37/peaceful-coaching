@@ -1,47 +1,65 @@
-import { Calendar, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { TodayCalendar } from "./TodayCalendar";
-import { TodayAppointmentsList } from "./TodayAppointmentsList";
+import { MonthlyCalendar } from "../agenda/MonthlyCalendar";
+import { DailyAppointmentsList } from "../agenda/DailyAppointmentsList";
 import { ClientHeader } from "./ClientHeader";
 import { AppointmentDialog } from "../agenda/AppointmentDialog";
-import { useState } from "react";
+import { useAppointments } from "@/hooks/useAppointments";
 
 interface TopBannerProps {
   selectedClientId: string | null;
   onClientSelect: (clientId: string) => void;
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
 }
 
-export const TopBanner = ({ selectedClientId, onClientSelect }: TopBannerProps) => {
+export const TopBanner = ({ 
+  selectedClientId, 
+  onClientSelect, 
+  selectedDate, 
+  onDateChange 
+}: TopBannerProps) => {
   const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
+  const { appointments } = useAppointments();
 
   return (
     <div className="h-full grid grid-cols-12 gap-3 p-3">
-      {/* Zone gauche : Mini-calendrier + RDV du jour */}
-      <div className="col-span-3 space-y-3">
-        <Card>
-          <CardContent className="p-2">
-            <TodayCalendar />
+      {/* Zone gauche : Calendrier mensuel */}
+      <div className="col-span-4">
+        <Card className="h-full">
+          <CardContent className="p-3 h-full overflow-auto">
+            <MonthlyCalendar
+              selectedDate={selectedDate}
+              onDateChange={onDateChange}
+              appointments={appointments}
+            />
           </CardContent>
         </Card>
-        
-        <div className="flex-1 overflow-hidden">
-          <TodayAppointmentsList 
-            selectedClientId={selectedClientId}
-            onClientSelect={onClientSelect}
-          />
-        </div>
       </div>
 
-      {/* Zone centre élargie : Fiche patient active */}
-      <div className="col-span-9">
+      {/* Zone centre : RDV du jour sélectionné */}
+      <div className="col-span-3">
+        <Card className="h-full">
+          <CardContent className="p-3 h-full">
+            <DailyAppointmentsList
+              selectedDate={selectedDate}
+              appointments={appointments}
+              onNewAppointment={() => setShowAppointmentDialog(true)}
+              onSelectAppointment={(appointment) => onClientSelect(appointment.client_id)}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Zone droite : Fiche patient active élargie */}
+      <div className="col-span-5">
         {selectedClientId ? (
           <Card className="h-full">
-            <CardContent className="p-2 h-full">
+            <CardContent className="p-3 h-full">
               <ClientHeader 
                 clientId={selectedClientId} 
                 onTakeAppointment={() => setShowAppointmentDialog(true)}
+                expanded={true}
               />
             </CardContent>
           </Card>
