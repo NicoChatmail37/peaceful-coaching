@@ -38,34 +38,29 @@ export const MonthlyCalendar = ({
   const weekDays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-1">
       {/* Navigation du mois */}
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" onClick={() => navigateMonth('prev')}>
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-3 w-3" />
         </Button>
         
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold">
-            {format(selectedDate, 'MMMM yyyy', { locale: fr })}
-          </h3>
-          <Button variant="outline" size="sm" onClick={goToToday}>
-            Aujourd'hui
-          </Button>
-        </div>
+        <h3 className="text-xs font-medium">
+          {format(selectedDate, 'MMM yyyy', { locale: fr })}
+        </h3>
         
         <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-3 w-3" />
         </Button>
       </div>
 
       {/* Grille du calendrier */}
-      <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+      <div className="grid grid-cols-7 gap-px bg-border rounded overflow-hidden">
         {/* En-têtes des jours de la semaine */}
         {weekDays.map((day) => (
-          <div key={day} className="bg-muted p-3 text-center">
-            <div className="font-medium text-sm text-muted-foreground">
-              {day}
+          <div key={day} className="bg-muted px-1 py-0.5 text-center">
+            <div className="font-medium text-xs text-muted-foreground">
+              {day.slice(0, 1)}
             </div>
           </div>
         ))}
@@ -85,41 +80,30 @@ export const MonthlyCalendar = ({
               key={day.toISOString()}
               onClick={() => onDateChange(day)}
               className={cn(
-                "bg-background p-2 min-h-[100px] text-left hover:bg-accent/50 transition-colors border-none",
+                "bg-background p-1 h-6 text-left hover:bg-accent/50 transition-colors border-none relative",
                 !isCurrentMonth && "opacity-50",
-                isSelected && "ring-2 ring-primary ring-inset",
+                isSelected && "ring-1 ring-primary ring-inset",
                 isDayToday && "bg-primary/10"
               )}
             >
               <div className={cn(
-                "text-sm font-medium mb-1",
+                "text-xs font-medium",
                 isDayToday && "text-primary font-bold"
               )}>
                 {format(day, 'd')}
               </div>
               
-              {/* Indicateurs de rendez-vous */}
-              <div className="space-y-1">
-                {dayAppointments.slice(0, 2).map((appointment) => (
-                  <div
-                    key={appointment.id}
-                    className={cn(
-                      "text-xs p-1 rounded truncate",
-                      appointment.status === 'scheduled' && "bg-blue-100 text-blue-800",
-                      appointment.status === 'done' && "bg-green-100 text-green-800",
-                      appointment.status === 'canceled' && "bg-red-100 text-red-800",
-                      appointment.status === 'no_show' && "bg-gray-100 text-gray-800"
-                    )}
-                  >
-                    {format(parseISO(appointment.starts_at), 'HH:mm')} {appointment.client_name}
-                  </div>
-                ))}
-                {dayAppointments.length > 2 && (
-                  <div className="text-xs text-muted-foreground">
-                    +{dayAppointments.length - 2} autres
-                  </div>
-                )}
-              </div>
+              {/* Points indicateurs de RDV */}
+              {dayAppointments.length > 0 && (
+                <div className="absolute bottom-0.5 left-1 flex gap-0.5">
+                  {Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-1 h-1 rounded-full bg-primary"
+                    />
+                  ))}
+                </div>
+              )}
             </button>
           );
         })}

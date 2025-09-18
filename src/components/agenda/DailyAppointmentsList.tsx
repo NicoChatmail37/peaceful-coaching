@@ -47,9 +47,9 @@ export const DailyAppointmentsList = ({
   return (
     <div className="h-full flex flex-col">
       {/* En-tête */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1">
         <div>
-          <h3 className="font-medium text-sm">
+          <h3 className="font-medium text-xs">
             {format(selectedDate, 'EEE d MMM', { locale: fr })}
           </h3>
           <p className="text-xs text-muted-foreground">
@@ -62,39 +62,31 @@ export const DailyAppointmentsList = ({
       </div>
 
       {/* Liste des RDV */}
-      <div className="flex-1 overflow-auto space-y-2">
+      <div className="flex-1 overflow-auto space-y-1">
         {dayAppointments.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Aucun RDV ce jour</p>
+          <div className="text-center py-2 text-muted-foreground">
+            <p className="text-xs">Aucun RDV</p>
           </div>
         ) : (
           dayAppointments.map((appointment) => (
             <div
               key={appointment.id}
-              className="border rounded-lg p-3 hover:bg-accent/50 cursor-pointer transition-colors"
+              className="border rounded p-1 hover:bg-accent/50 cursor-pointer transition-colors"
               onClick={() => onSelectAppointment?.(appointment)}
             >
-              <div className="flex items-start justify-between mb-1">
-                <div className="font-medium text-sm truncate">
+              <div className="flex items-start justify-between">
+                <div className="font-medium text-xs truncate">
                   {appointment.client_name}
                 </div>
-                <Badge variant="outline" className={`text-xs ${getStatusColor(appointment.status)}`}>
-                  {getStatusLabel(appointment.status)}
+                <Badge variant="outline" className={`text-xs ${getStatusColor(appointment.status)} px-1 py-0`}>
+                  {getStatusLabel(appointment.status).slice(0, 1)}
                 </Badge>
               </div>
               
               <div className="text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {format(parseISO(appointment.starts_at), 'HH:mm', { locale: fr })} - 
-                  {format(parseISO(appointment.ends_at), 'HH:mm', { locale: fr })}
-                </div>
+                {format(parseISO(appointment.starts_at), 'HH:mm', { locale: fr })}
                 {appointment.title && (
-                  <div className="mt-1 truncate">{appointment.title}</div>
-                )}
-                {appointment.location && (
-                  <div className="mt-1 truncate">📍 {appointment.location}</div>
+                  <span className="ml-1 truncate">- {appointment.title}</span>
                 )}
               </div>
             </div>

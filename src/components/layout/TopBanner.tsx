@@ -23,11 +23,11 @@ export const TopBanner = ({
   const { appointments } = useAppointments();
 
   return (
-    <div className="h-full grid grid-cols-12 gap-3 p-3">
+    <div className="h-full grid grid-cols-12 gap-2 p-2">
       {/* Zone gauche : Calendrier mensuel */}
       <div className="col-span-4">
         <Card className="h-full">
-          <CardContent className="p-3 h-full overflow-auto">
+          <CardContent className="p-2 h-full overflow-auto">
             <MonthlyCalendar
               selectedDate={selectedDate}
               onDateChange={onDateChange}
@@ -40,7 +40,7 @@ export const TopBanner = ({
       {/* Zone centre : RDV du jour sélectionné */}
       <div className="col-span-3">
         <Card className="h-full">
-          <CardContent className="p-3 h-full">
+          <CardContent className="p-2 h-full">
             <DailyAppointmentsList
               selectedDate={selectedDate}
               appointments={appointments}
@@ -55,7 +55,7 @@ export const TopBanner = ({
       <div className="col-span-5">
         {selectedClientId ? (
           <Card className="h-full">
-            <CardContent className="p-3 h-full">
+            <CardContent className="p-2 h-full">
               <ClientHeader 
                 clientId={selectedClientId} 
                 onTakeAppointment={() => setShowAppointmentDialog(true)}
