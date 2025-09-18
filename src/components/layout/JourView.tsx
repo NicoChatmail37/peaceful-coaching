@@ -1,46 +1,41 @@
-import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { LeftRail } from "./LeftRail";
-import { ClientPane } from "./ClientPane";
-import { RightPane } from "./RightPane";
+import { TopBanner } from "./TopBanner";
+import { ChildTabs } from "./ChildTabs";
 
 export const JourView = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const clientId = searchParams.get('clientId');
-  const activeTab = searchParams.get('tab') || 'overview';
+  const childTab = searchParams.get('childTab') || 'sessions';
 
   const handleClientSelect = (newClientId: string) => {
-    setSearchParams({ clientId: newClientId, tab: activeTab });
+    setSearchParams({ clientId: newClientId, childTab });
   };
 
-  const handleTabChange = (newTab: string) => {
+  const handleChildTabChange = (newChildTab: string) => {
     if (clientId) {
-      setSearchParams({ clientId, tab: newTab });
+      setSearchParams({ clientId, childTab: newChildTab });
+    } else {
+      setSearchParams({ childTab: newChildTab });
     }
   };
 
   return (
-    <div className="flex-1 flex h-[calc(100vh-120px)]">
-      {/* Panneau Gauche - 320px */}
-      <div className="w-80 border-r border-border bg-muted/30">
-        <LeftRail 
+    <div className="flex-1 flex flex-col h-[calc(100vh-120px)]">
+      {/* Bandeau fixe en haut - 3 zones */}
+      <div className="h-48 border-b border-border bg-card">
+        <TopBanner 
           selectedClientId={clientId}
           onClientSelect={handleClientSelect}
         />
       </div>
 
-      {/* Panneau Centre - Flexible */}
-      <div className="flex-1 min-w-0">
-        <ClientPane 
+      {/* Zone centrale avec onglets enfants */}
+      <div className="flex-1 overflow-hidden">
+        <ChildTabs 
           clientId={clientId}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
+          activeChildTab={childTab}
+          onChildTabChange={handleChildTabChange}
         />
-      </div>
-
-      {/* Panneau Droit - 400px */}
-      <div className="w-96 border-l border-border bg-card">
-        <RightPane clientId={clientId} />
       </div>
     </div>
   );

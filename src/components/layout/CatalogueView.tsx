@@ -1,23 +1,17 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { InvoiceList } from "@/components/InvoiceList";
-import { PatientsPanel } from "@/components/patients/PatientsPanel";
-import { CompanyManagement } from "@/components/CompanyManagement";
-import { CompanySettings } from "@/components/CompanySettings";
-import { LLMSettings } from "@/components/LLMSettings";
-import { FileText, Users, Package, Settings } from "lucide-react";
+import { Users, Package, Settings } from "lucide-react";
+import { ContactsInvoicesTab } from "./tabs/ContactsInvoicesTab";
+import { ProductsTab } from "./tabs/ProductsTab";
+import { SettingsTab } from "./tabs/SettingsTab";
 
 export const CatalogueView = () => {
   return (
-    <div className="flex-1 p-6">
-      <Tabs defaultValue="invoices" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="invoices" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Factures
-          </TabsTrigger>
-          <TabsTrigger value="contacts" className="flex items-center gap-2">
+    <div className="flex-1">
+      <Tabs defaultValue="contacts-invoices" className="h-full flex flex-col">
+        <TabsList className="grid w-full grid-cols-3 rounded-none border-b border-border h-12 bg-muted/30">
+          <TabsTrigger value="contacts-invoices" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Contacts
+            Contacts & Factures
           </TabsTrigger>
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
@@ -29,40 +23,19 @@ export const CatalogueView = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="invoices" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Toutes les factures</h2>
-          </div>
-          {/* TODO: Fix InvoiceList props */}
-          <div className="text-muted-foreground">Liste des factures à venir...</div>
-        </TabsContent>
+        <div className="flex-1 overflow-hidden">
+          <TabsContent value="contacts-invoices" className="h-full mt-0">
+            <ContactsInvoicesTab />
+          </TabsContent>
 
-        <TabsContent value="contacts" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Contacts & Patients</h2>
-          </div>
-          {/* TODO: Fix PatientsPanel props */}
-          <div className="text-muted-foreground">Liste des contacts à venir...</div>
-        </TabsContent>
+          <TabsContent value="products" className="h-full mt-0">
+            <ProductsTab />
+          </TabsContent>
 
-        <TabsContent value="products" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Produits & Services</h2>
-          </div>
-          {/* TODO: Products component */}
-          <div className="text-muted-foreground">Gestion des produits à venir...</div>
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Paramètres</h2>
-          </div>
-          <div className="grid gap-6">
-            <CompanyManagement />
-            <CompanySettings />
-            <LLMSettings />
-          </div>
-        </TabsContent>
+          <TabsContent value="settings" className="h-full mt-0">
+            <SettingsTab />
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );
