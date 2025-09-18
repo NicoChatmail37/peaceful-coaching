@@ -40,12 +40,12 @@ export const TodayAppointmentsList = ({ selectedClientId, onClientSelect }: Toda
 
   if (loading) {
     return (
-      <div className="p-4">
-        <div className="space-y-3">
+      <div className="p-2">
+        <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="animate-pulse space-y-2">
-              <div className="h-4 bg-muted rounded"></div>
-              <div className="h-3 bg-muted/60 rounded w-3/4"></div>
+            <div key={i} className="animate-pulse space-y-1">
+              <div className="h-3 bg-muted rounded"></div>
+              <div className="h-2 bg-muted/60 rounded w-3/4"></div>
             </div>
           ))}
         </div>
@@ -55,19 +55,19 @@ export const TodayAppointmentsList = ({ selectedClientId, onClientSelect }: Toda
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-border">
-        <h3 className="font-medium text-sm flex items-center gap-2">
-          <Clock className="h-4 w-4" />
-          RDV d'aujourd'hui ({todayAppointments.length})
+      <div className="p-2 border-b border-border">
+        <h3 className="font-medium text-xs flex items-center gap-1">
+          <Clock className="h-3 w-3" />
+          RDV aujourd'hui ({todayAppointments.length})
         </h3>
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-3">
+        <div className="p-2 space-y-2">
           {todayAppointments.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Aucun RDV aujourd'hui</p>
+            <div className="text-center py-4 text-muted-foreground">
+              <User className="h-4 w-4 mx-auto mb-1 opacity-50" />
+              <p className="text-xs">Aucun RDV</p>
             </div>
           ) : (
             todayAppointments.map((appointment) => (
@@ -75,18 +75,18 @@ export const TodayAppointmentsList = ({ selectedClientId, onClientSelect }: Toda
                 key={appointment.id}
                 onClick={() => onClientSelect(appointment.client_id)}
                 className={cn(
-                  "p-3 rounded-lg border cursor-pointer transition-all hover:shadow-soft",
+                  "p-2 rounded border cursor-pointer transition-all hover:shadow-sm",
                   selectedClientId === appointment.client_id 
                     ? "border-primary bg-primary/5" 
                     : "border-border hover:border-primary/50"
                 )}
               >
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm">
+                    <span className="font-medium text-xs truncate">
                       {appointment.client_name || 'Client sans nom'}
                     </span>
-                    <Badge variant="secondary" className={getStatusColor(appointment.status)}>
+                    <Badge variant="secondary" className={cn("text-xs py-0 px-1", getStatusColor(appointment.status))}>
                       {getStatusLabel(appointment.status)}
                     </Badge>
                   </div>
@@ -97,14 +97,8 @@ export const TodayAppointmentsList = ({ selectedClientId, onClientSelect }: Toda
                   </div>
                   
                   {appointment.title && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground truncate">
                       {appointment.title}
-                    </div>
-                  )}
-                  
-                  {appointment.location && (
-                    <div className="text-xs text-muted-foreground">
-                      📍 {appointment.location}
                     </div>
                   )}
                 </div>

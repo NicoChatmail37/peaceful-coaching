@@ -20,9 +20,9 @@ export const JourView = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-120px)]">
-      {/* Bandeau fixe en haut - 3 zones */}
-      <div className="h-48 border-b border-border bg-card">
+    <div className="flex-1 flex flex-col h-[calc(100vh-152px)]">
+      {/* Bandeau fixe en haut - 2 zones */}
+      <div className="h-32 border-b border-border bg-card">
         <TopBanner 
           selectedClientId={clientId}
           onClientSelect={handleClientSelect}

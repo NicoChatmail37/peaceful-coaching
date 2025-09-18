@@ -10,9 +10,10 @@ import { fr } from "date-fns/locale";
 
 interface ClientHeaderProps {
   clientId: string;
+  onTakeAppointment?: () => void;
 }
 
-export const ClientHeader = ({ clientId }: ClientHeaderProps) => {
+export const ClientHeader = ({ clientId, onTakeAppointment }: ClientHeaderProps) => {
   const { clients } = useClients();
   const { sessions } = useSessions(clientId);
   const { invoices } = useInvoices();
@@ -33,65 +34,54 @@ export const ClientHeader = ({ clientId }: ClientHeaderProps) => {
   }
 
   return (
-    <div className="p-6 border-b border-border bg-gradient-to-r from-card to-muted/20">
-      <div className="space-y-4">
-        {/* Infos client */}
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
+    <div className="space-y-3">
+      {/* En-tête client compact */}
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg font-semibold text-foreground truncate">{client.name}</h2>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
             {client.email && (
-              <p className="text-sm text-muted-foreground">{client.email}</p>
+              <span className="flex items-center gap-1 truncate">
+                📧 {client.email}
+              </span>
             )}
             {client.phone && (
-              <p className="text-sm text-muted-foreground">{client.phone}</p>
+              <span className="flex items-center gap-1">
+                📞 {client.phone}
+              </span>
             )}
           </div>
-          
-          <Button className="bg-primary hover:bg-primary/90">
-            <Calendar className="h-4 w-4 mr-2" />
-            Prendre rendez-vous
+        </div>
+        
+        {onTakeAppointment && (
+          <Button size="sm" variant="outline" onClick={onTakeAppointment} className="ml-2 shrink-0">
+            <Calendar className="h-3 w-3 mr-1" />
+            RDV
           </Button>
+        )}
+      </div>
+
+      {/* KPI rapides compacts */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-muted/30 rounded p-2 text-center">
+          <div className="text-sm font-semibold text-foreground">{sessions.length}</div>
+          <div className="text-xs text-muted-foreground">Séances</div>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              <div>
-                <div className="text-lg font-semibold">{sessions.length}</div>
-                <div className="text-xs text-muted-foreground">Séances</div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-success" />
-              <div>
-                <div className="text-lg font-semibold">{clientInvoices.length}</div>
-                <div className="text-xs text-muted-foreground">Factures</div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <Euro className="h-4 w-4 text-accent" />
-              <div>
-                <div className="text-lg font-semibold">{totalInvoiced.toFixed(2)}</div>
-                <div className="text-xs text-muted-foreground">CHF facturés</div>
-              </div>
-            </div>
-          </Card>
+        <div className="bg-muted/30 rounded p-2 text-center">
+          <div className="text-sm font-semibold text-foreground">{clientInvoices.length}</div>
+          <div className="text-xs text-muted-foreground">Factures</div>
         </div>
 
-        {/* Dernière séance */}
+        <div className="bg-muted/30 rounded p-2 text-center">
+          <div className="text-sm font-semibold text-foreground">CHF {totalInvoiced.toFixed(0)}</div>
+          <div className="text-xs text-muted-foreground">Facturé</div>
+        </div>
+
         {lastSession && (
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">
-              Dernière séance: {format(new Date(lastSession.created_at), 'dd MMM yyyy', { locale: fr })}
-            </Badge>
+          <div className="bg-muted/30 rounded p-2 text-center">
+            <div className="text-sm font-semibold text-foreground">{format(new Date(lastSession.created_at), 'dd/MM', { locale: fr })}</div>
+            <div className="text-xs text-muted-foreground">Dernière</div>
           </div>
         )}
       </div>
