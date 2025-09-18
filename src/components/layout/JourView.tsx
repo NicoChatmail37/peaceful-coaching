@@ -33,6 +33,9 @@ export const JourView = () => {
         />
       </div>
 
+      {/* Espacement entre le bandeau et les onglets */}
+      <div className="h-4 bg-background"></div>
+
       {/* Zone centrale avec onglets enfants */}
       <div className="flex-1 overflow-hidden">
         <ChildTabs 
