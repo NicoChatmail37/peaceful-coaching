@@ -21,6 +21,7 @@ interface AppointmentDialogProps {
   onOpenChange: (open: boolean) => void;
   appointment?: Appointment | null;
   defaultDate?: Date;
+  defaultClientId?: string | null;
   onSuccess: () => void;
 }
 
@@ -29,6 +30,7 @@ export const AppointmentDialog = ({
   onOpenChange,
   appointment,
   defaultDate,
+  defaultClientId,
   onSuccess
 }: AppointmentDialogProps) => {
   const [formData, setFormData] = useState({
@@ -59,7 +61,7 @@ export const AppointmentDialog = ({
       });
     } else {
       setFormData({
-        client_id: '',
+        client_id: defaultClientId || '',
         title: '',
         date: format(defaultDate || new Date(), 'yyyy-MM-dd'),
         start_time: '09:00',
@@ -67,7 +69,7 @@ export const AppointmentDialog = ({
         location: ''
       });
     }
-  }, [appointment, defaultDate, open]);
+  }, [appointment, defaultDate, defaultClientId, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

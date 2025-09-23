@@ -20,12 +20,23 @@ export const TopBanner = ({
   onDateChange 
 }: TopBannerProps) => {
   const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<any>(null);
   const { appointments } = useAppointments();
 
+  const handleNewAppointment = () => {
+    setEditingAppointment(null);
+    setShowAppointmentDialog(true);
+  };
+
+  const handleEditAppointment = (appointment: any) => {
+    setEditingAppointment(appointment);
+    setShowAppointmentDialog(true);
+  };
+
   return (
-    <div className="h-full grid grid-cols-12 gap-2 p-2">
+    <div className="h-full grid grid-cols-10 gap-2 p-2">
       {/* Zone gauche : Calendrier mensuel */}
-      <div className="col-span-4">
+      <div className="col-span-3">
         <Card className="h-full">
           <CardContent className="p-2 h-full overflow-auto">
             <MonthlyCalendar
@@ -38,14 +49,15 @@ export const TopBanner = ({
       </div>
 
       {/* Zone centre : RDV du jour sélectionné */}
-      <div className="col-span-3">
+      <div className="col-span-2">
         <Card className="h-full">
           <CardContent className="p-2 h-full">
             <DailyAppointmentsList
               selectedDate={selectedDate}
               appointments={appointments}
-              onNewAppointment={() => setShowAppointmentDialog(true)}
+              onNewAppointment={handleNewAppointment}
               onSelectAppointment={(appointment) => onClientSelect(appointment.client_id)}
+              onEditAppointment={handleEditAppointment}
             />
           </CardContent>
         </Card>
@@ -80,6 +92,9 @@ export const TopBanner = ({
       <AppointmentDialog
         open={showAppointmentDialog}
         onOpenChange={setShowAppointmentDialog}
+        appointment={editingAppointment}
+        defaultDate={selectedDate}
+        defaultClientId={selectedClientId}
         onSuccess={() => setShowAppointmentDialog(false)}
       />
     </div>

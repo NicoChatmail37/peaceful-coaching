@@ -68,26 +68,31 @@ export const ClientHeader = ({ clientId, onTakeAppointment, expanded = false }: 
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-muted/30 rounded-lg p-3 text-center">
-          <div className="text-lg font-semibold text-foreground">{sessions.length}</div>
-          <div className="text-sm text-muted-foreground">Séances totales</div>
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-muted/30 rounded-lg p-2 text-center">
+          <div className="text-base font-semibold text-foreground">{sessions.length}</div>
+          <div className="text-xs text-muted-foreground">Séances</div>
         </div>
 
-        <div className="bg-muted/30 rounded-lg p-3 text-center">
-          <div className="text-lg font-semibold text-foreground">CHF {totalInvoiced.toFixed(0)}</div>
-          <div className="text-sm text-muted-foreground">Total facturé</div>
+        <div className="bg-muted/30 rounded-lg p-2 text-center">
+          <div className="text-base font-semibold text-foreground">CHF {totalInvoiced.toFixed(0)}</div>
+          <div className="text-xs text-muted-foreground">Facturé</div>
         </div>
 
-        <div className="bg-muted/30 rounded-lg p-3 text-center">
-          <div className="text-lg font-semibold text-foreground">{clientInvoices.length}</div>
-          <div className="text-sm text-muted-foreground">Factures</div>
+        <div className="bg-muted/30 rounded-lg p-2 text-center">
+          <div className="text-base font-semibold text-foreground">{clientInvoices.length}</div>
+          <div className="text-xs text-muted-foreground">Factures</div>
         </div>
 
-        {lastSession && (
-          <div className="bg-muted/30 rounded-lg p-3 text-center">
-            <div className="text-lg font-semibold text-foreground">{format(new Date(lastSession.created_at), 'dd/MM', { locale: fr })}</div>
-            <div className="text-sm text-muted-foreground">Dernière séance</div>
+        {lastSession ? (
+          <div className="bg-muted/30 rounded-lg p-2 text-center">
+            <div className="text-base font-semibold text-foreground">{format(new Date(lastSession.created_at), 'dd/MM', { locale: fr })}</div>
+            <div className="text-xs text-muted-foreground">Dernière</div>
+          </div>
+        ) : (
+          <div className="bg-muted/30 rounded-lg p-2 text-center">
+            <div className="text-base font-semibold text-foreground">-</div>
+            <div className="text-xs text-muted-foreground">Dernière</div>
           </div>
         )}
       </div>

@@ -2,22 +2,27 @@ import { format, isSameDay, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Clock } from "lucide-react";
-import { AppointmentWithClient } from "@/hooks/useAppointments";
+import { Plus, Clock, Edit2, Trash2 } from "lucide-react";
+import { AppointmentWithClient, useAppointments } from "@/hooks/useAppointments";
+import { useToast } from "@/hooks/use-toast";
 
 interface DailyAppointmentsListProps {
   selectedDate: Date;
   appointments: AppointmentWithClient[];
   onNewAppointment: () => void;
   onSelectAppointment?: (appointment: AppointmentWithClient) => void;
+  onEditAppointment?: (appointment: AppointmentWithClient) => void;
 }
 
 export const DailyAppointmentsList = ({
   selectedDate,
   appointments,
   onNewAppointment,
-  onSelectAppointment
+  onSelectAppointment,
+  onEditAppointment
 }: DailyAppointmentsListProps) => {
+  const { deleteAppointment } = useAppointments();
+  const { toast } = useToast();
   
   // Filtrer les RDV pour la date sélectionnée
   const dayAppointments = appointments.filter(appointment => 
@@ -42,6 +47,18 @@ export const DailyAppointmentsList = ({
       case 'no_show': return 'Absent';
       default: return status;
     }
+  };
+
+  const handleDeleteAppointment = async (appointmentId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce rendez-vous ?')) {
+      await deleteAppointment(appointmentId);
+    }
+  };
+
+  const handleEditAppointment = (appointment: AppointmentWithClient, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEditAppointment?.(appointment);
   };
 
   return (
@@ -71,16 +88,36 @@ export const DailyAppointmentsList = ({
           dayAppointments.map((appointment) => (
             <div
               key={appointment.id}
-              className="border rounded p-1 hover:bg-accent/50 cursor-pointer transition-colors"
+              className="border rounded p-1 hover:bg-accent/50 cursor-pointer transition-colors group"
               onClick={() => onSelectAppointment?.(appointment)}
             >
               <div className="flex items-start justify-between">
                 <div className="font-medium text-xs truncate">
                   {appointment.client_name}
                 </div>
-                <Badge variant="outline" className={`text-xs ${getStatusColor(appointment.status)} px-1 py-0`}>
-                  {getStatusLabel(appointment.status).slice(0, 1)}
-                </Badge>
+                <div className="flex items-center gap-1">
+                  <Badge variant="outline" className={`text-xs ${getStatusColor(appointment.status)} px-1 py-0`}>
+                    {getStatusLabel(appointment.status).slice(0, 1)}
+                  </Badge>
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-4 w-4 p-0"
+                      onClick={(e) => handleEditAppointment(appointment, e)}
+                    >
+                      <Edit2 className="h-2.5 w-2.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-4 w-4 p-0 hover:text-destructive"
+                      onClick={(e) => handleDeleteAppointment(appointment.id, e)}
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </Button>
+                  </div>
+                </div>
               </div>
               
               <div className="text-xs text-muted-foreground">
