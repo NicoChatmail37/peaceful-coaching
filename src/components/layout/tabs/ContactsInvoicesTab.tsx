@@ -25,10 +25,10 @@ export const ContactsInvoicesTab = () => {
   // Get selected client
   const selectedClient = selectedClientId ? clients.find(c => c.id === selectedClientId) : null;
 
-  // Filter invoices for selected client
-  const clientInvoices = selectedClient 
+  // Filter invoices - show all by default, filter by client if selected
+  const displayedInvoices = selectedClient 
     ? invoices.filter(invoice => {
-        // For now, match by client name since we don't have direct client_id relation
+        // Match by client name since we don't have direct client_id relation
         const matchesClient = invoice.clientName === selectedClient.name;
         
         if (invoiceFilter === 'all') return matchesClient;
@@ -37,7 +37,14 @@ export const ContactsInvoicesTab = () => {
         
         return matchesClient;
       })
-    : [];
+    : invoices.filter(invoice => {
+        // Show all invoices when no client is selected, filtered by status
+        if (invoiceFilter === 'all') return true;
+        if (invoiceFilter === 'pending') return invoice.status !== 'paid';
+        if (invoiceFilter === 'paid') return invoice.status === 'paid';
+        
+        return true;
+      });
 
   return (
     <div className="h-full flex">
@@ -101,11 +108,11 @@ export const ContactsInvoicesTab = () => {
         </div>
       </div>
 
-      {/* Colonne droite : Factures du client sélectionné */}
+      {/* Colonne droite : Toutes les factures ou factures du client sélectionné */}
       <div className="flex-1 p-6">
-        {selectedClient ? (
-          <div className="space-y-6">
-            {/* Client info */}
+        <div className="space-y-6">
+          {/* Header avec info client ou titre général */}
+          {selectedClient ? (
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -119,88 +126,116 @@ export const ContactsInvoicesTab = () => {
                       )}
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      {displayedInvoices.length} facture{displayedInvoices.length > 1 ? 's' : ''}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedClientId(null)}
+                    >
+                      Voir toutes les factures
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">Toutes les factures</h2>
+                    <div className="text-sm text-muted-foreground">
+                      Vue d'ensemble de toutes les factures
+                    </div>
+                  </div>
                   <Badge variant="outline">
-                    {clientInvoices.length} facture{clientInvoices.length > 1 ? 's' : ''}
+                    {displayedInvoices.length} facture{displayedInvoices.length > 1 ? 's' : ''}
                   </Badge>
                 </div>
               </CardContent>
             </Card>
+          )}
 
-            {/* Invoices */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Receipt className="h-5 w-5" />
-                    Factures
-                  </CardTitle>
-                  
-                  <Tabs value={invoiceFilter} onValueChange={(value) => setInvoiceFilter(value as typeof invoiceFilter)}>
-                    <TabsList>
-                      <TabsTrigger value="all">Toutes</TabsTrigger>
-                      <TabsTrigger value="pending">En cours</TabsTrigger>
-                      <TabsTrigger value="paid">Acquittées</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-96">
-                  <div className="space-y-3">
-                    {clientInvoices.map((invoice) => (
-                      <div key={invoice.id} className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
+          {/* Invoices */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5" />
+                  Factures {selectedClient ? `de ${selectedClient.name}` : ''}
+                </CardTitle>
+                
+                <Tabs value={invoiceFilter} onValueChange={(value) => setInvoiceFilter(value as typeof invoiceFilter)}>
+                  <TabsList>
+                    <TabsTrigger value="all">Toutes</TabsTrigger>
+                    <TabsTrigger value="pending">En cours</TabsTrigger>
+                    <TabsTrigger value="paid">Acquittées</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-96">
+                <div className="space-y-3">
+                  {displayedInvoices.map((invoice) => (
+                    <div key={invoice.id} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
                           <span className="font-medium">{invoice.number}</span>
-                          <Badge 
-                            variant={
-                              invoice.status === 'paid' ? 'default' : 
-                              invoice.status === 'sent' ? 'secondary' : 
-                              'outline'
-                            }
-                          >
-                            {invoice.status === 'paid' ? 'Payée' :
-                             invoice.status === 'sent' ? 'Envoyée' :
-                             'Brouillon'}
-                          </Badge>
+                          {!selectedClient && (
+                            <span className="text-sm text-muted-foreground">• {invoice.clientName}</span>
+                          )}
                         </div>
-                        <div className="text-sm text-muted-foreground mb-2">
-                          {new Date(invoice.date).toLocaleDateString()}
+                        <Badge 
+                          variant={
+                            invoice.status === 'paid' ? 'default' : 
+                            invoice.status === 'sent' ? 'secondary' : 
+                            'outline'
+                          }
+                        >
+                          {invoice.status === 'paid' ? 'Payée' :
+                           invoice.status === 'sent' ? 'Envoyée' :
+                           'Brouillon'}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground mb-2">
+                        {new Date(invoice.date).toLocaleDateString()}
+                      </div>
+                      <div className="font-semibold text-lg">
+                        CHF {invoice.total.toFixed(2)}
+                      </div>
+                      {invoice.notes && (
+                        <div className="text-sm text-muted-foreground mt-2">
+                          {invoice.notes}
                         </div>
-                        <div className="font-semibold text-lg">
-                          CHF {invoice.total.toFixed(2)}
-                        </div>
-                        {invoice.notes && (
-                          <div className="text-sm text-muted-foreground mt-2">
-                            {invoice.notes}
-                          </div>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {displayedInvoices.length === 0 && !invoicesLoading && (
+                    <div className="text-center py-8">
+                      <Receipt className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        {selectedClient ? (
+                          invoiceFilter === 'all' ? 'Aucune facture pour ce client' :
+                          invoiceFilter === 'pending' ? 'Aucune facture en cours pour ce client' :
+                          'Aucune facture acquittée pour ce client'
+                        ) : (
+                          invoiceFilter === 'all' ? 'Aucune facture' :
+                          invoiceFilter === 'pending' ? 'Aucune facture en cours' :
+                          'Aucune facture acquittée'
                         )}
-                      </div>
-                    ))}
-                    
-                    {clientInvoices.length === 0 && (
-                      <div className="text-center py-8">
-                        <Receipt className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground">
-                          {invoiceFilter === 'all' ? 'Aucune facture' :
-                           invoiceFilter === 'pending' ? 'Aucune facture en cours' :
-                           'Aucune facture acquittée'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center text-muted-foreground">
-            <div className="text-center space-y-2">
-              <Users className="h-12 w-12 mx-auto opacity-50" />
-              <h3 className="text-lg font-medium">Sélectionnez un client</h3>
-              <p className="text-sm">Choisissez un client dans la liste pour voir ses factures</p>
-            </div>
-          </div>
-        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

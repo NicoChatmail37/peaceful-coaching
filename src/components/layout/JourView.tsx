@@ -23,8 +23,8 @@ export const JourView = () => {
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-152px)]">
-      {/* Bandeau fixe en haut - 3 zones */}
-      <div className="h-16 border-b border-border bg-card">
+      {/* Bandeau fixe en haut - 3 zones - Hauteur fixe */}
+      <div className="h-64 border-b border-border bg-card">
         <TopBanner 
           selectedClientId={clientId}
           onClientSelect={handleClientSelect}
@@ -33,8 +33,8 @@ export const JourView = () => {
         />
       </div>
 
-      {/* Zone centrale avec onglets enfants */}
-      <div className="flex-1 overflow-hidden">
+      {/* Zone centrale avec onglets enfants - Hauteur calculée */}
+      <div className="h-[calc(100vh-416px)] overflow-hidden">
         <ChildTabs 
           clientId={clientId}
           activeChildTab={childTab}

@@ -1963,6 +1963,10 @@ export type Database = {
         Args: { p_client_id: string; p_started_at?: string }
         Returns: string
       }
+      get_user_role_in_company: {
+        Args: { p_company_id: string; p_user_id: string }
+        Returns: string
+      }
       is_member_company: {
         Args: { c_id: string }
         Returns: boolean
