@@ -37,6 +37,7 @@ interface ModelStatus {
   description: string;
   downloading?: boolean;
   progress?: number;
+  downloadError?: string;
 }
 
 export const IALocalSettings = () => {
@@ -106,10 +107,15 @@ export const IALocalSettings = () => {
       await modelDownloadService.download(model, (progress) => {
         setDownloads(prev => new Map(prev.set(model, progress)));
         
-        // Update model status
+        // Update model status with detailed progress info
         setModelStatuses(prev => prev.map(m => 
           m.model === model 
-            ? { ...m, downloading: true, progress: progress.progress }
+            ? { 
+                ...m, 
+                downloading: true, 
+                progress: progress.progress,
+                downloadError: progress.error
+              }
             : m
         ));
       });
@@ -118,14 +124,17 @@ export const IALocalSettings = () => {
       await loadEnvironmentAndPreferences();
       
       toast({
-        title: "Téléchargement terminé",
-        description: `Le modèle ${model} est maintenant disponible`,
+        title: "Téléchargement terminé ✅",
+        description: `Le modèle ${model} est maintenant disponible pour la transcription`,
       });
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Téléchargement échoué";
+      console.error('Model download failed:', error);
+      
       toast({
-        title: "Erreur de téléchargement",
-        description: error instanceof Error ? error.message : "Téléchargement échoué",
+        title: "Échec du téléchargement",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -137,7 +146,7 @@ export const IALocalSettings = () => {
       
       setModelStatuses(prev => prev.map(m => 
         m.model === model 
-          ? { ...m, downloading: false, progress: undefined }
+          ? { ...m, downloading: false, progress: undefined, downloadError: undefined }
           : m
       ));
     }
@@ -354,6 +363,11 @@ export const IALocalSettings = () => {
                       <Progress value={model.progress} className="w-full h-2" />
                       <div className="text-xs text-muted-foreground mt-1">
                         Téléchargement... {Math.round(model.progress)}%
+                        {model.downloadError && (
+                          <div className="text-amber-600 dark:text-amber-400 mt-1">
+                            {model.downloadError}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

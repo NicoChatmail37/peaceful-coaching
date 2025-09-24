@@ -35,10 +35,36 @@ class ModelDownloadService implements ModelDownloadManager {
       this.progressCallbacks.set(model, onProgress);
     }
 
-    try {
-      // Check if already cached
-      const cached = await this.checkIfCached(model);
-      if (cached) {
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Check if already cached
+        const cached = await this.checkIfCached(model);
+        if (cached) {
+          this.updateProgress(model, {
+            model,
+            progress: 100,
+            status: 'completed',
+            bytesLoaded: this.getModelSize(model),
+            bytesTotal: this.getModelSize(model)
+          });
+          return;
+        }
+
+        // Start download with retry info
+        this.updateProgress(model, {
+          model,
+          progress: 5,
+          status: 'downloading',
+          bytesLoaded: 0,
+          bytesTotal: this.getModelSize(model),
+          error: attempt > 1 ? `Tentative ${attempt}/${maxRetries}` : undefined
+        });
+
+        await this.downloadModel(model, controller.signal, attempt);
+        
         this.updateProgress(model, {
           model,
           progress: 100,
@@ -46,44 +72,53 @@ class ModelDownloadService implements ModelDownloadManager {
           bytesLoaded: this.getModelSize(model),
           bytesTotal: this.getModelSize(model)
         });
-        return;
-      }
+        return; // Success, exit retry loop
 
-      // Start download
-      await this.downloadModel(model, controller.signal);
-      
-      this.updateProgress(model, {
-        model,
-        progress: 100,
-        status: 'completed',
-        bytesLoaded: this.getModelSize(model),
-        bytesTotal: this.getModelSize(model)
-      });
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Download failed');
+        
+        if (lastError.name === 'AbortError') {
+          this.updateProgress(model, {
+            model,
+            progress: 0,
+            status: 'cancelled',
+            bytesLoaded: 0,
+            bytesTotal: this.getModelSize(model)
+          });
+          return;
+        }
 
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        this.updateProgress(model, {
-          model,
-          progress: 0,
-          status: 'cancelled',
-          bytesLoaded: 0,
-          bytesTotal: this.getModelSize(model)
-        });
-      } else {
-        this.updateProgress(model, {
-          model,
-          progress: 0,
-          status: 'error',
-          bytesLoaded: 0,
-          bytesTotal: this.getModelSize(model),
-          error: error instanceof Error ? error.message : 'Download failed'
-        });
-        throw error;
+        // If this is the last attempt, handle final error
+        if (attempt === maxRetries) {
+          const errorMessage = this.getDetailedErrorMessage(lastError);
+          this.updateProgress(model, {
+            model,
+            progress: 0,
+            status: 'error',
+            bytesLoaded: 0,
+            bytesTotal: this.getModelSize(model),
+            error: errorMessage
+          });
+          throw new Error(errorMessage);
+        }
+
+        // Wait before retry with exponential backoff
+        const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
       }
-    } finally {
-      this.activeDownloads.delete(model);
-      this.progressCallbacks.delete(model);
     }
+
+    // This should never be reached, but just in case
+    const finalError = lastError || new Error('Download failed after retries');
+    this.updateProgress(model, {
+      model,
+      progress: 0,
+      status: 'error',
+      bytesLoaded: 0,
+      bytesTotal: this.getModelSize(model),
+      error: this.getDetailedErrorMessage(finalError)
+    });
+    throw finalError;
   }
 
   cancel(model: WhisperModel): void {
@@ -109,49 +144,79 @@ class ModelDownloadService implements ModelDownloadManager {
     return this.activeDownloads.has(model);
   }
 
-  private async downloadModel(model: WhisperModel, signal: AbortSignal): Promise<void> {
+  private async downloadModel(model: WhisperModel, signal: AbortSignal, attempt: number = 1): Promise<void> {
     // For HuggingFace models, we trigger the download by initializing the pipeline
     // The actual caching is handled by transformers.js internally
     
     const { pipeline } = await import('@huggingface/transformers');
     const modelName = `onnx-community/whisper-${model}.en`;
 
-    this.updateProgress(model, {
-      model,
-      progress: 10,
-      status: 'downloading',
-      bytesLoaded: 0,
-      bytesTotal: this.getModelSize(model)
-    });
+    // Try WebGPU first, fallback to CPU
+    const deviceConfigs = [
+      { device: 'webgpu' as const, dtype: 'fp16' as const, description: 'WebGPU' },
+      { device: 'cpu' as const, dtype: 'fp32' as const, description: 'CPU' }
+    ];
 
-    // Create pipeline - this will download and cache the model
-    const pipe = await pipeline(
-      'automatic-speech-recognition',
-      modelName,
-      {
-        device: 'webgpu',
-        dtype: 'fp16',
-        progress_callback: (progress: any) => {
-          if (signal.aborted) return;
-          
-          // Progress from transformers.js
-          const progressPercent = Math.min(90, 10 + (progress.progress || 0) * 80);
-          this.updateProgress(model, {
-            model,
-            progress: progressPercent,
-            status: 'downloading',
-            bytesLoaded: Math.floor((progressPercent / 100) * this.getModelSize(model)),
-            bytesTotal: this.getModelSize(model)
-          });
+    let lastError: Error | null = null;
+
+    for (const config of deviceConfigs) {
+      if (signal.aborted) return;
+
+      try {
+        this.updateProgress(model, {
+          model,
+          progress: 15,
+          status: 'downloading',
+          bytesLoaded: 0,
+          bytesTotal: this.getModelSize(model),
+          error: config.device === 'cpu' ? 'WebGPU non supporté, utilisation CPU...' : undefined
+        });
+
+        // Create pipeline - this will download and cache the model
+        const pipe = await pipeline(
+          'automatic-speech-recognition',
+          modelName,
+          {
+            device: config.device,
+            dtype: config.dtype,
+            progress_callback: (progress: any) => {
+              if (signal.aborted) return;
+              
+              // Progress from transformers.js
+              const baseProgress = config.device === 'cpu' ? 20 : 15;
+              const progressPercent = Math.min(90, baseProgress + (progress.progress || 0) * 70);
+              this.updateProgress(model, {
+                model,
+                progress: progressPercent,
+                status: 'downloading',
+                bytesLoaded: Math.floor((progressPercent / 100) * this.getModelSize(model)),
+                bytesTotal: this.getModelSize(model),
+                error: config.device === 'cpu' ? `Mode CPU activé (${config.description})` : undefined
+              });
+            }
+          }
+        );
+
+        // Store preference that model is ready
+        await this.markModelAsReady(model);
+        
+        // Clean up pipeline reference
+        pipe.dispose?.();
+        return; // Success
+        
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(`Failed with ${config.description}`);
+        console.warn(`Model download failed with ${config.description}:`, error);
+        
+        // If this is not the last config, continue to next
+        if (config !== deviceConfigs[deviceConfigs.length - 1]) {
+          continue;
         }
       }
-    );
+    }
 
-    // Store preference that model is ready
-    await this.markModelAsReady(model);
-    
-    // Clean up pipeline reference
-    pipe.dispose?.();
+    // If we get here, all device configs failed
+    throw lastError || new Error('Failed to download model with any device configuration');
   }
 
   private async checkIfCached(model: WhisperModel): Promise<boolean> {
@@ -186,6 +251,32 @@ class ModelDownloadService implements ModelDownloadManager {
       medium: 769 * 1024 * 1024 // 769 MB
     };
     return sizes[model] || sizes.tiny;
+  }
+
+  private getDetailedErrorMessage(error: Error): string {
+    const message = error.message.toLowerCase();
+    
+    if (message.includes('cors') || message.includes('network')) {
+      return 'Erreur réseau : Vérifiez votre connexion internet et réessayez';
+    }
+    
+    if (message.includes('webgpu') || message.includes('gpu')) {
+      return 'WebGPU non supporté : Téléchargement en mode CPU (plus lent)';
+    }
+    
+    if (message.includes('memory') || message.includes('quota')) {
+      return 'Mémoire insuffisante : Essayez un modèle plus petit (tiny ou base)';
+    }
+    
+    if (message.includes('fetch') || message.includes('timeout')) {
+      return 'Connexion interrompue : Cliquez pour reprendre le téléchargement';
+    }
+    
+    if (message.includes('abort')) {
+      return 'Téléchargement annulé par l\'utilisateur';
+    }
+    
+    return `Erreur de téléchargement : ${error.message}`;
   }
 
   private updateProgress(model: WhisperModel, progress: DownloadProgress): void {
