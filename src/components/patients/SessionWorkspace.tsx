@@ -220,12 +220,14 @@ export const SessionWorkspace = ({
           </TabsContent>
 
           <TabsContent value="transcription" className="flex-1 m-0">
-            <TranscriptionPanel
-              sessionId={session.id}
-              clientId={patient.id}
-              onTranscriptReady={(text) => setTranscriptText(text)}
-              disabled={isFinalized}
-            />
+            <ScrollArea className="h-full">
+              <TranscriptionPanel
+                sessionId={session.id}
+                clientId={patient.id}
+                onTranscriptReady={(text) => setTranscriptText(text)}
+                disabled={isFinalized}
+              />
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </div>
