@@ -1,8 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Package, Settings } from "lucide-react";
+import { Users, Package, Building } from "lucide-react";
 import { ContactsInvoicesTab } from "./tabs/ContactsInvoicesTab";
 import { ProductsTab } from "./tabs/ProductsTab";
-import { SettingsTab } from "./tabs/SettingsTab";
+import { EntrepriseTab } from "./tabs/EntrepriseTab";
 
 export const CatalogueView = () => {
   return (
@@ -17,9 +17,9 @@ export const CatalogueView = () => {
             <Package className="h-4 w-4" />
             Produits
           </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Paramètres
+          <TabsTrigger value="entreprise" className="flex items-center gap-2">
+            <Building className="h-4 w-4" />
+            Entreprise
           </TabsTrigger>
         </TabsList>
 
@@ -32,8 +32,8 @@ export const CatalogueView = () => {
             <ProductsTab />
           </TabsContent>
 
-          <TabsContent value="settings" className="h-full mt-0">
-            <SettingsTab />
+          <TabsContent value="entreprise" className="h-full mt-0">
+            <EntrepriseTab />
           </TabsContent>
         </div>
       </Tabs>

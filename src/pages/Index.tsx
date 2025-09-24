@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { TopTabs } from "@/components/layout/TopTabs";
 import { JourView } from "@/components/layout/JourView";
 import { CatalogueView } from "@/components/layout/CatalogueView";
+import { TechnicalSettingsView } from "@/components/layout/TechnicalSettingsView";
 
 export interface Invoice {
   id: string;
@@ -57,8 +58,10 @@ const Index = () => {
       <div className="flex-1 overflow-hidden">
         {activeTopTab === 'jour' ? (
           <JourView />
-        ) : (
+        ) : activeTopTab === 'catalogue' ? (
           <CatalogueView />
+        ) : (
+          <TechnicalSettingsView />
         )}
       </div>
     </div>

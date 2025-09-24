@@ -129,18 +129,70 @@ export async function pingLLMBridge(): Promise<boolean> {
  */
 export async function getLLMBridgeStatus(): Promise<LLMBridgeStatus | null> {
   try {
-    const response = await fetch(`${LLM_BRIDGE_URL}/status`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    // Get preferences from localStorage
+    const saved = localStorage.getItem('llm_preferences');
+    let preferences: {
+      backend: 'ollama' | 'lmstudio' | 'disabled';
+      ollamaUrl: string;
+      lmstudioUrl: string;
+      defaultModel: string;
+    } = {
+      backend: 'ollama',
+      ollamaUrl: 'http://localhost:11434',
+      lmstudioUrl: 'http://localhost:1234',
+      defaultModel: 'llama3.1:8b'
+    };
     
-    if (!response.ok) {
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        preferences = { ...preferences, ...parsed };
+      } catch (error) {
+        console.error('Error parsing LLM preferences:', error);
+      }
+    }
+
+    if (preferences.backend === 'disabled') {
       return null;
     }
     
-    return await response.json();
+    // Check Ollama
+    if (preferences.backend === 'ollama') {
+      try {
+        const response = await fetch(`${preferences.ollamaUrl}/api/tags`);
+        if (response.ok) {
+          const data = await response.json();
+          return {
+            ok: true,
+            backend: 'ollama',
+            available_models: data.models?.map((m: any) => m.name) || [],
+            default_model: preferences.defaultModel
+          };
+        }
+      } catch (error) {
+        console.log('Ollama not available:', error);
+      }
+    }
+    
+    // Check LM Studio
+    if (preferences.backend === 'lmstudio') {
+      try {
+        const response = await fetch(`${preferences.lmstudioUrl}/v1/models`);
+        if (response.ok) {
+          const data = await response.json();
+          return {
+            ok: true,
+            backend: 'lmstudio',
+            available_models: data.data?.map((m: any) => m.id) || [],
+            default_model: preferences.defaultModel
+          };
+        }
+      } catch (error) {
+        console.log('LM Studio not available:', error);
+      }
+    }
+    
+    return null;
   } catch (error) {
     console.error('Error checking LLM bridge status:', error);
     return null;
@@ -241,10 +293,10 @@ async function callLLMBridge(
 ): Promise<string> {
   const { model = 'llama3.1:8b', onProgress } = options;
   
-  // Vérifier que le bridge est disponible
-  const isAvailable = await pingLLMBridge();
-  if (!isAvailable) {
-    throw new Error('Bridge LLM non disponible. Veuillez démarrer Ollama ou LM Studio.');
+  // Vérifier que le service LLM est disponible
+  const status = await getLLMBridgeStatus();
+  if (!status || !status.ok) {
+    throw new Error('Service LLM non disponible. Veuillez démarrer Ollama ou LM Studio.');
   }
   
   const request: LLMRequest = {
@@ -265,7 +317,38 @@ async function callLLMBridge(
   };
   
   try {
-    const response = await fetch(`${LLM_BRIDGE_URL}/v1/chat/completions`, {
+    // Get preferences to determine the correct URL
+    const saved = localStorage.getItem('llm_preferences');
+    let preferences: {
+      backend: 'ollama' | 'lmstudio' | 'disabled';
+      ollamaUrl: string;
+      lmstudioUrl: string;
+    } = {
+      backend: 'ollama',
+      ollamaUrl: 'http://localhost:11434',
+      lmstudioUrl: 'http://localhost:1234'
+    };
+    
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        preferences = { ...preferences, ...parsed };
+      } catch (error) {
+        console.error('Error parsing LLM preferences:', error);
+      }
+    }
+    
+    // Determine the correct endpoint
+    let endpoint = '';
+    if (preferences.backend === 'ollama') {
+      endpoint = `${preferences.ollamaUrl}/v1/chat/completions`;
+    } else if (preferences.backend === 'lmstudio') {
+      endpoint = `${preferences.lmstudioUrl}/v1/chat/completions`;
+    } else {
+      throw new Error('Backend LLM non configuré');
+    }
+    
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

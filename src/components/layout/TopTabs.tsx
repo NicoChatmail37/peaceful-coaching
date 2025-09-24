@@ -1,5 +1,5 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Settings } from "lucide-react";
+import { Calendar, Package, Settings } from "lucide-react";
 
 interface TopTabsProps {
   value: string;
@@ -23,8 +23,15 @@ export const TopTabs = ({ value, onValueChange }: TopTabsProps) => {
               value="catalogue" 
               className="h-12 px-6 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
             >
+              <Package className="h-4 w-4 mr-2" />
+              Catalogue
+            </TabsTrigger>
+            <TabsTrigger 
+              value="settings" 
+              className="h-12 px-6 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+            >
               <Settings className="h-4 w-4 mr-2" />
-              Catalogue & Réglages
+              Paramètres
             </TabsTrigger>
           </TabsList>
         </Tabs>

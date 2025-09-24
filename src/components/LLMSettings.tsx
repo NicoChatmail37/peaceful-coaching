@@ -55,7 +55,41 @@ export const LLMSettings = () => {
   const checkBridgeStatus = async () => {
     setCheckingBridge(true);
     try {
-      const status = await getLLMBridgeStatus();
+      // Check based on selected backend
+      let status = null;
+      
+      if (preferences.backend === 'ollama') {
+        try {
+          const response = await fetch(`${preferences.ollamaUrl}/api/tags`);
+          if (response.ok) {
+            const data = await response.json();
+            status = {
+              ok: true,
+              backend: 'ollama' as const,
+              available_models: data.models?.map((m: any) => m.name) || [],
+              default_model: preferences.defaultModel
+            };
+          }
+        } catch (error) {
+          console.log('Ollama not available:', error);
+        }
+      } else if (preferences.backend === 'lmstudio') {
+        try {
+          const response = await fetch(`${preferences.lmstudioUrl}/v1/models`);
+          if (response.ok) {
+            const data = await response.json();
+            status = {
+              ok: true,
+              backend: 'lmstudio' as const,
+              available_models: data.data?.map((m: any) => m.id) || [],
+              default_model: preferences.defaultModel
+            };
+          }
+        } catch (error) {
+          console.log('LM Studio not available:', error);
+        }
+      }
+      
       setBridgeStatus(status);
     } catch (error) {
       setBridgeStatus(null);
@@ -95,15 +129,7 @@ export const LLMSettings = () => {
   };
 
   return (
-    <div className="w-full space-y-6">
-      <Tabs defaultValue="llm" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="llm">LLM Local</TabsTrigger>
-          <TabsTrigger value="whisper">Transcription</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="llm" className="space-y-4">
-          <Card className="w-full">
+    <Card className="w-full">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -274,12 +300,5 @@ export const LLMSettings = () => {
         </div>
       </CardContent>
     </Card>
-        </TabsContent>
-        
-        <TabsContent value="whisper" className="space-y-4">
-          <IALocalSettings />
-        </TabsContent>
-      </Tabs>
-    </div>
   );
 };
