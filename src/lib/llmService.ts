@@ -31,7 +31,7 @@ export interface LLMStreamChunk {
 
 export interface LLMBridgeStatus {
   isConnected: boolean;
-  backend: 'ollama' | 'lmstudio' | 'disabled';
+  backend: 'ollama' | 'lmstudio' | 'bridge' | 'disabled';
   models: string[];
   error?: string;
   url?: string;
@@ -130,7 +130,7 @@ export async function pingLLMBridge(): Promise<boolean> {
  */
 export async function getLLMBridgeStatus(): Promise<LLMBridgeStatus> {
   const preferences = JSON.parse(localStorage.getItem('llm_preferences') || '{}');
-  const backend = preferences.backend || 'disabled';
+  const backend = preferences.backend || 'bridge';
 
   console.log('🔍 LLM Bridge Status Check:', { backend, preferences });
 
@@ -144,31 +144,70 @@ export async function getLLMBridgeStatus(): Promise<LLMBridgeStatus> {
     };
   }
 
-  try {
-    let url: string;
-    let response: Response;
-
-    if (backend === 'ollama') {
-      url = preferences.ollamaUrl || 'http://localhost:11434';
-      const testUrl = `${url}/api/tags`;
-      console.log('🔗 Testing Ollama connection:', testUrl);
+  // Helper function to try different URLs
+  const tryUrls = async (urls: string[], testPath: string, headers: Record<string, string> = {}) => {
+    for (const baseUrl of urls) {
+      const testUrl = `${baseUrl}${testPath}`;
+      console.log(`🔗 Testing connection: ${testUrl}`);
       
-      response = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(5000)
-      });
+      try {
+        const response = await fetch(testUrl, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          signal: AbortSignal.timeout(8000)
+        });
 
-      console.log('📡 Ollama response status:', response.status, response.statusText);
+        console.log(`📡 Response from ${testUrl}:`, response.status, response.statusText);
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'No response body');
-        console.log('❌ Ollama error response:', errorText);
-        throw new Error(`Ollama API error: ${response.status} ${response.statusText} - ${errorText}`);
+        if (response.ok) {
+          return { response, url: testUrl };
+        }
+      } catch (error) {
+        console.log(`❌ Failed to connect to ${testUrl}:`, error instanceof Error ? error.message : error);
+      }
+    }
+    throw new Error('All connection attempts failed');
+  };
+
+  try {
+    if (backend === 'bridge') {
+      const bridgeUrl = preferences.bridgeUrl || 'http://localhost:27123';
+      const urls = [bridgeUrl];
+      
+      // Add localhost variant if using 127.0.0.1
+      if (bridgeUrl.includes('127.0.0.1')) {
+        urls.push(bridgeUrl.replace('127.0.0.1', 'localhost'));
+      } else if (bridgeUrl.includes('localhost')) {
+        urls.push(bridgeUrl.replace('localhost', '127.0.0.1'));
       }
 
+      const { response, url: testUrl } = await tryUrls(urls, '/status');
+      const data = await response.json();
+      console.log('✅ Bridge status:', data);
+      
+      // Check if bridge has LLM backend available
+      const hasLLM = data.llm && data.llm.ok;
+      const models = data.llm?.available_models || [];
+      
+      return {
+        isConnected: hasLLM,
+        backend: 'bridge',
+        models,
+        url: testUrl,
+        error: hasLLM ? undefined : 'Bridge OK but no LLM backend available'
+      };
+    } else if (backend === 'ollama') {
+      const ollamaUrl = preferences.ollamaUrl || 'http://localhost:11434';
+      const urls = [ollamaUrl];
+      
+      // Add localhost/127.0.0.1 variants
+      if (ollamaUrl.includes('127.0.0.1')) {
+        urls.push(ollamaUrl.replace('127.0.0.1', 'localhost'));
+      } else if (ollamaUrl.includes('localhost')) {
+        urls.push(ollamaUrl.replace('localhost', '127.0.0.1'));
+      }
+
+      const { response, url: testUrl } = await tryUrls(urls, '/api/tags');
       const data = await response.json();
       console.log('✅ Ollama models found:', data.models?.length || 0);
       
@@ -179,27 +218,18 @@ export async function getLLMBridgeStatus(): Promise<LLMBridgeStatus> {
         url: testUrl
       };
     } else if (backend === 'lmstudio') {
-      url = preferences.lmstudioUrl || 'http://localhost:1234';
-      const testUrl = `${url}/v1/models`;
-      console.log('🔗 Testing LM Studio connection:', testUrl);
+      const lmstudioUrl = preferences.lmstudioUrl || 'http://localhost:1234';
+      const urls = [lmstudioUrl];
       
-      response = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(preferences.apiKey && { 'Authorization': `Bearer ${preferences.apiKey}` })
-        },
-        signal: AbortSignal.timeout(5000)
-      });
-
-      console.log('📡 LM Studio response status:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'No response body');
-        console.log('❌ LM Studio error response:', errorText);
-        throw new Error(`LM Studio API error: ${response.status} ${response.statusText} - ${errorText}`);
+      // Add localhost/127.0.0.1 variants
+      if (lmstudioUrl.includes('127.0.0.1')) {
+        urls.push(lmstudioUrl.replace('127.0.0.1', 'localhost'));
+      } else if (lmstudioUrl.includes('localhost')) {
+        urls.push(lmstudioUrl.replace('localhost', '127.0.0.1'));
       }
 
+      const headers = preferences.apiKey ? { 'Authorization': `Bearer ${preferences.apiKey}` } : {};
+      const { response, url: testUrl } = await tryUrls(urls, '/v1/models', headers);
       const data = await response.json();
       console.log('✅ LM Studio models found:', data.data?.length || 0);
       
@@ -229,9 +259,38 @@ export async function getLLMBridgeStatus(): Promise<LLMBridgeStatus> {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         errorMessage = `Cannot connect to ${backend} service. Is it running?`;
       } else if (error.name === 'AbortError' || error.message.includes('timeout')) {
-        errorMessage = `Connection timeout to ${backend} service`;
+        errorMessage = `Connection timeout to ${backend} service (8s)`;
       } else if (error.message.includes('ECONNREFUSED')) {
         errorMessage = `${backend} service is not accessible. Check if it's running on the configured port.`;
+      }
+    }
+
+    // Try intelligent fallback to bridge if direct connection fails
+    if ((backend === 'ollama' || backend === 'lmstudio') && !errorMessage.includes('Bridge')) {
+      console.log(`🔄 ${backend} failed, trying bridge fallback...`);
+      try {
+        const bridgeUrl = preferences.bridgeUrl || 'http://localhost:27123';
+        const bridgeResponse = await fetch(`${bridgeUrl}/status`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000)
+        });
+
+        if (bridgeResponse.ok) {
+          const bridgeData = await bridgeResponse.json();
+          if (bridgeData.llm && bridgeData.llm.ok) {
+            console.log('✅ Bridge fallback successful!');
+            return {
+              isConnected: true,
+              backend: 'bridge',
+              models: bridgeData.llm.available_models || [],
+              url: `${bridgeUrl}/status`,
+              error: `${backend} direct connection failed, using bridge fallback. Consider switching to Bridge backend.`
+            };
+          }
+        }
+      } catch (bridgeError) {
+        console.log('❌ Bridge fallback also failed:', bridgeError);
       }
     }
     
@@ -365,13 +424,16 @@ async function callLLMBridge(
     // Get preferences to determine the correct URL
     const saved = localStorage.getItem('llm_preferences');
     let preferences: {
-      backend: 'ollama' | 'lmstudio' | 'disabled';
+      backend: 'ollama' | 'lmstudio' | 'bridge' | 'disabled';
       ollamaUrl: string;
       lmstudioUrl: string;
+      bridgeUrl: string;
+      apiKey?: string;
     } = {
-      backend: 'ollama',
+      backend: 'bridge',
       ollamaUrl: 'http://localhost:11434',
-      lmstudioUrl: 'http://localhost:1234'
+      lmstudioUrl: 'http://localhost:1234',
+      bridgeUrl: 'http://localhost:27123'
     };
     
     if (saved) {
@@ -385,19 +447,24 @@ async function callLLMBridge(
     
     // Determine the correct endpoint
     let endpoint = '';
-    if (preferences.backend === 'ollama') {
+    let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    
+    if (preferences.backend === 'bridge') {
+      endpoint = `${preferences.bridgeUrl}/v1/chat/completions`;
+    } else if (preferences.backend === 'ollama') {
       endpoint = `${preferences.ollamaUrl}/v1/chat/completions`;
     } else if (preferences.backend === 'lmstudio') {
       endpoint = `${preferences.lmstudioUrl}/v1/chat/completions`;
+      if (preferences.apiKey) {
+        headers['Authorization'] = `Bearer ${preferences.apiKey}`;
+      }
     } else {
       throw new Error('Backend LLM non configuré');
     }
     
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(request),
     });
     
