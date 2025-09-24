@@ -8,6 +8,9 @@ import { CompanyProvider } from "@/hooks/useCompany";
 import { SelectedClientProvider } from "@/contexts/SelectedClientContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
+import { useModelOnboarding } from "@/hooks/useModelOnboarding";
+import { PrepareDayModal } from "@/components/transcription/PrepareDayModal";
+import { useEffect } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -21,8 +24,35 @@ const AppContent = () => {
     warningMinutes: 5, 
     enabled: true 
   });
+
+  // Model onboarding for transcription
+  const {
+    showModal,
+    environment,
+    preferences,
+    downloadProgress,
+    probeAndShow,
+    handlePrepareModel,
+    handleSkip,
+    handleNeverShow,
+    setShowModal
+  } = useModelOnboarding();
+
+  // Probe environment on mount
+  useEffect(() => {
+    probeAndShow();
+  }, []);
   
   return (
+    <>
+      <PrepareDayModal
+        open={showModal}
+        onOpenChange={setShowModal}
+        environment={environment}
+        onPrepareModel={handlePrepareModel}
+        onSkip={handleSkip}
+        onNeverShow={handleNeverShow}
+      />
     <BrowserRouter>
       <Routes>
       <Route path="/auth" element={<Auth />} />
@@ -45,6 +75,7 @@ const AppContent = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
+    </>
   );
 };
 

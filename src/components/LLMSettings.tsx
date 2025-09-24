@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Brain, Settings, Wifi, WifiOff, AlertCircle, Save } from "lucide-react";
 import { getLLMBridgeStatus, LLMBridgeStatus } from "@/lib/llmService";
 import { toast } from "@/hooks/use-toast";
+import { IALocalSettings } from "@/components/transcription/IALocalSettings";
 
 interface LLMPreferences {
   backend: 'ollama' | 'lmstudio' | 'disabled';
@@ -93,7 +95,15 @@ export const LLMSettings = () => {
   };
 
   return (
-    <Card className="w-full">
+    <div className="w-full space-y-6">
+      <Tabs defaultValue="llm" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="llm">LLM Local</TabsTrigger>
+          <TabsTrigger value="whisper">Transcription</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="llm" className="space-y-4">
+          <Card className="w-full">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -264,5 +274,12 @@ export const LLMSettings = () => {
         </div>
       </CardContent>
     </Card>
+        </TabsContent>
+        
+        <TabsContent value="whisper" className="space-y-4">
+          <IALocalSettings />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
