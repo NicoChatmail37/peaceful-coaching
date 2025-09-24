@@ -30,10 +30,11 @@ export interface LLMStreamChunk {
 }
 
 export interface LLMBridgeStatus {
-  ok: boolean;
-  backend: 'ollama' | 'lmstudio' | null;
-  available_models: string[];
-  default_model: string;
+  isConnected: boolean;
+  backend: 'ollama' | 'lmstudio' | 'disabled';
+  models: string[];
+  error?: string;
+  url?: string;
 }
 
 export type AnalysisType = 'summary' | 'todos' | 'notes' | 'custom';
@@ -127,75 +128,119 @@ export async function pingLLMBridge(): Promise<boolean> {
 /**
  * Récupère le statut détaillé du bridge LLM
  */
-export async function getLLMBridgeStatus(): Promise<LLMBridgeStatus | null> {
-  try {
-    // Get preferences from localStorage
-    const saved = localStorage.getItem('llm_preferences');
-    let preferences: {
-      backend: 'ollama' | 'lmstudio' | 'disabled';
-      ollamaUrl: string;
-      lmstudioUrl: string;
-      defaultModel: string;
-    } = {
-      backend: 'ollama',
-      ollamaUrl: 'http://localhost:11434',
-      lmstudioUrl: 'http://localhost:1234',
-      defaultModel: 'llama3.1:8b'
+export async function getLLMBridgeStatus(): Promise<LLMBridgeStatus> {
+  const preferences = JSON.parse(localStorage.getItem('llm_preferences') || '{}');
+  const backend = preferences.backend || 'disabled';
+
+  console.log('🔍 LLM Bridge Status Check:', { backend, preferences });
+
+  if (backend === 'disabled') {
+    console.log('❌ LLM backend is disabled');
+    return {
+      isConnected: false,
+      backend: 'disabled',
+      models: [],
+      error: 'LLM backend is disabled'
     };
-    
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        preferences = { ...preferences, ...parsed };
-      } catch (error) {
-        console.error('Error parsing LLM preferences:', error);
+  }
+
+  try {
+    let url: string;
+    let response: Response;
+
+    if (backend === 'ollama') {
+      url = preferences.ollamaUrl || 'http://localhost:11434';
+      const testUrl = `${url}/api/tags`;
+      console.log('🔗 Testing Ollama connection:', testUrl);
+      
+      response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(5000)
+      });
+
+      console.log('📡 Ollama response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'No response body');
+        console.log('❌ Ollama error response:', errorText);
+        throw new Error(`Ollama API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
+
+      const data = await response.json();
+      console.log('✅ Ollama models found:', data.models?.length || 0);
+      
+      return {
+        isConnected: true,
+        backend: 'ollama',
+        models: data.models?.map((model: any) => model.name) || [],
+        url: testUrl
+      };
+    } else if (backend === 'lmstudio') {
+      url = preferences.lmstudioUrl || 'http://localhost:1234';
+      const testUrl = `${url}/v1/models`;
+      console.log('🔗 Testing LM Studio connection:', testUrl);
+      
+      response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(preferences.apiKey && { 'Authorization': `Bearer ${preferences.apiKey}` })
+        },
+        signal: AbortSignal.timeout(5000)
+      });
+
+      console.log('📡 LM Studio response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'No response body');
+        console.log('❌ LM Studio error response:', errorText);
+        throw new Error(`LM Studio API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ LM Studio models found:', data.data?.length || 0);
+      
+      return {
+        isConnected: true,
+        backend: 'lmstudio',
+        models: data.data?.map((model: any) => model.id) || [],
+        url: testUrl
+      };
     }
 
-    if (preferences.backend === 'disabled') {
-      return null;
-    }
-    
-    // Check Ollama
-    if (preferences.backend === 'ollama') {
-      try {
-        const response = await fetch(`${preferences.ollamaUrl}/api/tags`);
-        if (response.ok) {
-          const data = await response.json();
-          return {
-            ok: true,
-            backend: 'ollama',
-            available_models: data.models?.map((m: any) => m.name) || [],
-            default_model: preferences.defaultModel
-          };
-        }
-      } catch (error) {
-        console.log('Ollama not available:', error);
-      }
-    }
-    
-    // Check LM Studio
-    if (preferences.backend === 'lmstudio') {
-      try {
-        const response = await fetch(`${preferences.lmstudioUrl}/v1/models`);
-        if (response.ok) {
-          const data = await response.json();
-          return {
-            ok: true,
-            backend: 'lmstudio',
-            available_models: data.data?.map((m: any) => m.id) || [],
-            default_model: preferences.defaultModel
-          };
-        }
-      } catch (error) {
-        console.log('LM Studio not available:', error);
-      }
-    }
-    
-    return null;
+    console.log('❌ Unsupported backend:', backend);
+    return {
+      isConnected: false,
+      backend,
+      models: [],
+      error: `Backend ${backend} not supported`
+    };
   } catch (error) {
-    console.error('Error checking LLM bridge status:', error);
-    return null;
+    console.error('❌ LLM Bridge Connection Error:', error);
+    
+    let errorMessage = 'Unknown error occurred';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      // More specific error messages based on common issues
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = `Cannot connect to ${backend} service. Is it running?`;
+      } else if (error.name === 'AbortError' || error.message.includes('timeout')) {
+        errorMessage = `Connection timeout to ${backend} service`;
+      } else if (error.message.includes('ECONNREFUSED')) {
+        errorMessage = `${backend} service is not accessible. Check if it's running on the configured port.`;
+      }
+    }
+    
+    return {
+      isConnected: false,
+      backend,
+      models: [],
+      error: errorMessage
+    };
   }
 }
 
@@ -295,7 +340,7 @@ async function callLLMBridge(
   
   // Vérifier que le service LLM est disponible
   const status = await getLLMBridgeStatus();
-  if (!status || !status.ok) {
+  if (!status || !status.isConnected) {
     throw new Error('Service LLM non disponible. Veuillez démarrer Ollama ou LM Studio.');
   }
   
@@ -431,7 +476,7 @@ async function handleStreamingResponse(
 export async function getAvailableLLMModels(): Promise<string[]> {
   try {
     const status = await getLLMBridgeStatus();
-    return status?.available_models || [];
+    return status?.models || [];
   } catch (error) {
     console.error('Error fetching available LLM models:', error);
     return [];
@@ -443,8 +488,8 @@ export async function getAvailableLLMModels(): Promise<string[]> {
  */
 export async function getDefaultLLMModel(): Promise<string> {
   try {
-    const status = await getLLMBridgeStatus();
-    return status?.default_model || 'llama3.1:8b';
+    const preferences = JSON.parse(localStorage.getItem('llm_preferences') || '{}');
+    return preferences.defaultModel || 'llama3.1:8b';
   } catch (error) {
     return 'llama3.1:8b';
   }

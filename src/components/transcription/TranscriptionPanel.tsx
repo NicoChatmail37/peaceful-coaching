@@ -286,7 +286,7 @@ export const TranscriptionPanel = ({
       return;
     }
 
-    if (!llmBridgeStatus?.ok) {
+    if (!llmBridgeStatus?.isConnected) {
       toast({
         title: "LLM non disponible",
         description: "Veuillez démarrer Ollama ou LM Studio",
@@ -324,7 +324,7 @@ export const TranscriptionPanel = ({
           type: selectedAIType,
           prompt: `Generated ${selectedAIType}`,
           result,
-          model: llmBridgeStatus.default_model
+          model: 'llama3.1:8b' // Default model fallback
         });
         await loadAINotes();
       }
@@ -380,10 +380,10 @@ export const TranscriptionPanel = ({
               )}
             </Badge>
             <Badge 
-              variant={llmBridgeStatus?.ok ? "default" : "outline"} 
+              variant={llmBridgeStatus?.isConnected ? "default" : "outline"} 
               className="flex items-center gap-1"
             >
-              {llmBridgeStatus?.ok ? (
+              {llmBridgeStatus?.isConnected ? (
                 <>
                   <Brain className="h-3 w-3" />
                   LLM {llmBridgeStatus.backend?.toUpperCase()}
@@ -461,7 +461,7 @@ export const TranscriptionPanel = ({
           {bridgeStatus && (
             <p className="text-emerald-600">✓ Bridge connecté - GPU {bridgeStatus.device.toUpperCase()} disponible</p>
           )}
-          {llmBridgeStatus?.ok && (
+          {llmBridgeStatus?.isConnected && (
             <p className="text-blue-600">✓ LLM Local connecté ({llmBridgeStatus.backend}) - Analyse IA disponible</p>
           )}
           <p className="text-muted-foreground">🔒 Tout reste local — aucune donnée n'est envoyée au cloud</p>
@@ -562,12 +562,12 @@ export const TranscriptionPanel = ({
                       <Brain className="h-4 w-4" />
                       IA Locale
                     </Label>
-                    <Badge variant={llmBridgeStatus?.ok ? "default" : "secondary"}>
-                      {llmBridgeStatus?.ok ? "Connecté ✓" : "Non disponible"}
+                    <Badge variant={llmBridgeStatus?.isConnected ? "default" : "secondary"}>
+                      {llmBridgeStatus?.isConnected ? "Connecté ✓" : "Non disponible"}
                     </Badge>
                   </div>
 
-                  {llmBridgeStatus?.ok ? (
+                  {llmBridgeStatus?.isConnected ? (
                     <div className="space-y-3">
                       <div className="grid grid-cols-3 gap-2">
                         <Button

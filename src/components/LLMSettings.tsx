@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Brain, Settings, Wifi, WifiOff, AlertCircle, Save } from "lucide-react";
-import { getLLMBridgeStatus, LLMBridgeStatus } from "@/lib/llmService";
-import { toast } from "@/hooks/use-toast";
-import { IALocalSettings } from "@/components/transcription/IALocalSettings";
+import { Brain, Wifi, WifiOff, RefreshCw, Save, ExternalLink } from "lucide-react";
+import { getLLMBridgeStatus, type LLMBridgeStatus } from "@/lib/llmService";
+import { toast } from "sonner";
 
 interface LLMPreferences {
   backend: 'ollama' | 'lmstudio' | 'disabled';
@@ -54,45 +52,23 @@ export const LLMSettings = () => {
 
   const checkBridgeStatus = async () => {
     setCheckingBridge(true);
+    console.log('🔍 Manual bridge status check initiated');
+    
     try {
-      // Check based on selected backend
-      let status = null;
-      
-      if (preferences.backend === 'ollama') {
-        try {
-          const response = await fetch(`${preferences.ollamaUrl}/api/tags`);
-          if (response.ok) {
-            const data = await response.json();
-            status = {
-              ok: true,
-              backend: 'ollama' as const,
-              available_models: data.models?.map((m: any) => m.name) || [],
-              default_model: preferences.defaultModel
-            };
-          }
-        } catch (error) {
-          console.log('Ollama not available:', error);
-        }
-      } else if (preferences.backend === 'lmstudio') {
-        try {
-          const response = await fetch(`${preferences.lmstudioUrl}/v1/models`);
-          if (response.ok) {
-            const data = await response.json();
-            status = {
-              ok: true,
-              backend: 'lmstudio' as const,
-              available_models: data.data?.map((m: any) => m.id) || [],
-              default_model: preferences.defaultModel
-            };
-          }
-        } catch (error) {
-          console.log('LM Studio not available:', error);
-        }
-      }
-      
+      const status = await getLLMBridgeStatus();
+      console.log('📊 Bridge status result:', status);
       setBridgeStatus(status);
+      
+      // Show a toast with the result
+      if (status.isConnected) {
+        toast.success(`✅ Connected to ${status.backend} - ${status.models.length} models available`);
+      } else {
+        toast.error(`❌ Connection failed: ${status.error}`);
+      }
     } catch (error) {
-      setBridgeStatus(null);
+      console.error('❌ Error checking bridge status:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Bridge check failed: ${errorMessage}`);
     } finally {
       setCheckingBridge(false);
     }
@@ -103,19 +79,12 @@ export const LLMSettings = () => {
     try {
       localStorage.setItem('llm_preferences', JSON.stringify(preferences));
       
-      toast({
-        title: "Paramètres sauvegardés",
-        description: "Vos préférences LLM ont été enregistrées"
-      });
+      toast.success("Paramètres sauvegardés avec succès");
 
       // Revérifier le bridge après sauvegarde
       await checkBridgeStatus();
     } catch (error) {
-      toast({
-        title: "Erreur de sauvegarde",
-        description: "Impossible de sauvegarder les paramètres",
-        variant: "destructive"
-      });
+      toast.error("Impossible de sauvegarder les paramètres");
     } finally {
       setSaving(false);
     }
@@ -134,32 +103,7 @@ export const LLMSettings = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Brain className="h-5 w-5" />
-            <CardTitle className="text-lg">IA Locale (LLM)</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={bridgeStatus?.ok ? "default" : "outline"}>
-              {checkingBridge ? (
-                "Vérification..."
-              ) : bridgeStatus?.ok ? (
-                <>
-                  <Wifi className="h-3 w-3 mr-1" />
-                  Connecté ({bridgeStatus.backend})
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-3 w-3 mr-1" />
-                  Non disponible
-                </>
-              )}
-            </Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={checkBridgeStatus}
-              disabled={checkingBridge}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+            <CardTitle className="text-lg">LLM Local</CardTitle>
           </div>
         </div>
         <CardDescription>
@@ -169,32 +113,58 @@ export const LLMSettings = () => {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Statut du Bridge */}
-        {bridgeStatus?.ok ? (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-            <div className="flex items-center gap-2 text-emerald-800 mb-2">
-              <Wifi className="h-4 w-4" />
-              <span className="font-medium">Bridge LLM Actif</span>
-            </div>
-            <div className="text-sm text-emerald-700 space-y-1">
-              <p>Backend: <strong>{bridgeStatus.backend?.toUpperCase()}</strong></p>
-              <p>Modèle par défaut: <strong>{bridgeStatus.default_model}</strong></p>
-              <p>Modèles disponibles: {bridgeStatus.available_models?.length || 0}</p>
-            </div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            {bridgeStatus?.isConnected ? (
+              <>
+                <Wifi className="h-4 w-4 text-green-500" />
+                <Badge variant="default" className="bg-green-100 text-green-800">
+                  {bridgeStatus.backend} connecté ({bridgeStatus.models.length} modèles)
+                </Badge>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-4 w-4 text-red-500" />
+                <Badge variant="destructive">
+                  {bridgeStatus?.backend === 'disabled' ? 'LLM désactivé' : 
+                   `${bridgeStatus?.backend || 'LLM'} non accessible`}
+                </Badge>
+              </>
+            )}
           </div>
-        ) : (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="flex items-center gap-2 text-amber-800 mb-2">
-              <AlertCircle className="h-4 w-4" />
-              <span className="font-medium">Bridge LLM Non Détecté</span>
-            </div>
-            <div className="text-sm text-amber-700">
-              <p>Démarrez Ollama ou LM Studio pour activer l'IA locale.</p>
-              <p className="mt-1">
-                <strong>Ollama:</strong> <code>ollama serve</code><br/>
-                <strong>LM Studio:</strong> Onglet "Local Server" → Start Server
-              </p>
-            </div>
+          
+          <Button 
+            onClick={checkBridgeStatus} 
+            disabled={checkingBridge}
+            size="sm"
+            variant="outline"
+          >
+            {checkingBridge ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              "Vérifier"
+            )}
+          </Button>
+        </div>
+
+        {/* Debug information */}
+        {bridgeStatus && !bridgeStatus.isConnected && bridgeStatus.error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm text-red-700 font-medium mb-1">Erreur de connexion:</p>
+            <p className="text-xs text-red-600 font-mono">{bridgeStatus.error}</p>
+            {bridgeStatus.backend === 'ollama' && (
+              <div className="mt-2 text-xs text-red-600">
+                <p>• Vérifiez qu'Ollama est démarré : <code>ollama serve</code></p>
+                <p>• Testez dans votre navigateur : <a href="http://localhost:11434/api/tags" target="_blank" className="underline inline-flex items-center gap-1">http://localhost:11434/api/tags <ExternalLink className="h-3 w-3" /></a></p>
+                <p>• Listez vos modèles : <code>ollama list</code></p>
+              </div>
+            )}
+            {bridgeStatus.backend === 'lmstudio' && (
+              <div className="mt-2 text-xs text-red-600">
+                <p>• Vérifiez que LM Studio Server est démarré</p>
+                <p>• Testez dans votre navigateur : <a href="http://localhost:1234/v1/models" target="_blank" className="underline inline-flex items-center gap-1">http://localhost:1234/v1/models <ExternalLink className="h-3 w-3" /></a></p>
+              </div>
+            )}
           </div>
         )}
 
