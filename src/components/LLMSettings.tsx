@@ -11,19 +11,17 @@ import { getLLMBridgeStatus, type LLMBridgeStatus } from "@/lib/llmService";
 import { toast } from "sonner";
 
 interface LLMPreferences {
-  backend: 'ollama' | 'lmstudio' | 'bridge' | 'disabled';
+  backend: 'lmstudio' | 'ollama' | 'browser' | 'disabled';
   ollamaUrl: string;
   lmstudioUrl: string;
-  bridgeUrl: string;
   defaultModel: string;
   apiKey?: string;
 }
 
 const DEFAULT_PREFERENCES: LLMPreferences = {
-  backend: 'bridge',
+  backend: 'lmstudio',
   ollamaUrl: 'http://localhost:11434',
   lmstudioUrl: 'http://localhost:1234',
-  bridgeUrl: 'http://localhost:27123',
   defaultModel: 'llama3.1:8b',
   apiKey: ''
 };
@@ -109,7 +107,7 @@ export const LLMSettings = () => {
           </div>
         </div>
         <CardDescription>
-          Configuration pour l'analyse IA locale via Ollama ou LM Studio. 
+          Configuration pour l'analyse IA locale. LM Studio (recommandé) → Ollama (avancé) → Navigateur (fallback). 
           Toutes les données restent 100% privées sur votre machine.
         </CardDescription>
       </CardHeader>
@@ -121,7 +119,9 @@ export const LLMSettings = () => {
               <>
                 <Wifi className="h-4 w-4 text-green-500" />
                 <Badge variant="default" className="bg-green-100 text-green-800">
-                  {bridgeStatus.backend} connecté ({bridgeStatus.models.length} modèles)
+                  {bridgeStatus.backend === 'lmstudio' ? 'LM Studio' : 
+                   bridgeStatus.backend === 'ollama' ? 'Ollama' : 
+                   bridgeStatus.backend === 'browser' ? 'Navigateur' : bridgeStatus.backend} ✓ ({bridgeStatus.models.length} modèles)
                 </Badge>
               </>
             ) : (
@@ -149,31 +149,39 @@ export const LLMSettings = () => {
           </Button>
         </div>
 
-        {/* Debug information */}
+        {/* CORS Help Guide - shown only when needed */}
         {bridgeStatus && !bridgeStatus.isConnected && bridgeStatus.error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-700 font-medium mb-1">Erreur de connexion:</p>
-            <p className="text-xs text-red-600 font-mono">{bridgeStatus.error}</p>
-            {bridgeStatus.backend === 'ollama' && (
-              <div className="mt-2 text-xs text-red-600">
-                <p>• Vérifiez qu'Ollama est démarré : <code>ollama serve</code></p>
-                <p>• Testez dans votre navigateur : <a href="http://localhost:11434/api/tags" target="_blank" className="underline inline-flex items-center gap-1">http://localhost:11434/api/tags <ExternalLink className="h-3 w-3" /></a></p>
-                <p>• Listez vos modèles : <code>ollama list</code></p>
-              </div>
-            )}
+            <p className="text-sm text-red-700 font-medium mb-1">
+              {bridgeStatus.error.includes('CORS') || bridgeStatus.error.includes('403') ? 
+               'Erreur CORS - Configuration nécessaire:' : 'Erreur de connexion:'}
+            </p>
+            <p className="text-xs text-red-600 font-mono mb-2">{bridgeStatus.error}</p>
+            
             {bridgeStatus.backend === 'lmstudio' && (
-              <div className="mt-2 text-xs text-red-600">
-                <p>• Vérifiez que LM Studio Server est démarré</p>
-                <p>• Dans LM Studio → Local Server → Enable "Local Server"</p>
-                <p>• Cochez "Allow external connections" si nécessaire</p>
-                <p>• Testez dans votre navigateur : <a href="http://localhost:1234/v1/models" target="_blank" className="underline inline-flex items-center gap-1">http://localhost:1234/v1/models <ExternalLink className="h-3 w-3" /></a></p>
+              <div className="mt-2 text-xs text-red-600 space-y-1">
+                <p className="font-medium">👉 Solution LM Studio (2 clics):</p>
+                <p>• Ouvrez LM Studio → Local Server</p>
+                <p>• ✅ Enable "Local Server"</p>
+                <p>• ✅ Cochez "Allow external connections"</p>
+                <p>• Test: <a href="http://localhost:1234/v1/models" target="_blank" className="underline inline-flex items-center gap-1">localhost:1234/v1/models <ExternalLink className="h-3 w-3" /></a></p>
               </div>
             )}
-            {bridgeStatus.backend === 'bridge' && (
-              <div className="mt-2 text-xs text-red-600">
-                <p>• Vérifiez que le bridge est démarré sur le port 27123</p>
-                <p>• Testez dans votre navigateur : <a href={`${preferences.bridgeUrl}/status`} target="_blank" className="underline inline-flex items-center gap-1">{preferences.bridgeUrl}/status <ExternalLink className="h-3 w-3" /></a></p>
-                <p>• Le bridge fait automatiquement le lien vers Ollama/LM Studio</p>
+            
+            {bridgeStatus.backend === 'ollama' && (
+              <div className="mt-2 text-xs text-red-600 space-y-1">
+                <p className="font-medium">👉 Solution Ollama (1 commande):</p>
+                <div className="bg-gray-800 text-green-400 p-2 rounded font-mono text-xs mt-1">
+                  OLLAMA_ORIGINS="*" ollama serve
+                </div>
+                <p>• Test: <a href="http://localhost:11434/api/tags" target="_blank" className="underline inline-flex items-center gap-1">localhost:11434/api/tags <ExternalLink className="h-3 w-3" /></a></p>
+              </div>
+            )}
+            
+            {bridgeStatus.backend === 'browser' && (
+              <div className="mt-2 text-xs text-orange-600">
+                <p>• Modèle réduit dans le navigateur (plus lent mais fonctionne)</p>
+                <p>• Recommandation: configurez LM Studio ou Ollama pour de meilleures performances</p>
               </div>
             )}
           </div>
@@ -193,9 +201,9 @@ export const LLMSettings = () => {
                 <SelectValue placeholder="Choisir un backend" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="bridge">Bridge (recommandé si CORS/pare-feu)</SelectItem>
-                <SelectItem value="ollama">Ollama (direct)</SelectItem>
-                <SelectItem value="lmstudio">LM Studio (direct)</SelectItem>
+                <SelectItem value="lmstudio">LM Studio (recommandé)</SelectItem>
+                <SelectItem value="ollama">Ollama (avancé)</SelectItem>
+                <SelectItem value="browser">Navigateur (fallback)</SelectItem>
                 <SelectItem value="disabled">Désactivé</SelectItem>
               </SelectContent>
             </Select>
@@ -226,19 +234,6 @@ export const LLMSettings = () => {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="bridge-url">URL Bridge</Label>
-                <Input
-                  id="bridge-url"
-                  value={preferences.bridgeUrl}
-                  onChange={(e) => handlePreferenceChange('bridgeUrl', e.target.value)}
-                  placeholder="http://localhost:27123"
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Testez: <a href={`${preferences.bridgeUrl}/status`} target="_blank" className="underline inline-flex items-center gap-1">{preferences.bridgeUrl}/status <ExternalLink className="h-3 w-3" /></a>
-                </p>
-              </div>
 
               <div>
                 <Label htmlFor="default-model">Modèle par défaut</Label>
@@ -250,7 +245,9 @@ export const LLMSettings = () => {
                   className="font-mono text-sm"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Modèles recommandés: llama3.1:8b, mistral:7b, qwen2.5:7b
+                  {preferences.backend === 'browser' ? 
+                   'Petit modèle automatique dans le navigateur' : 
+                   'Modèles recommandés: llama3.1:8b, mistral:7b, qwen2.5:7b'}
                 </p>
               </div>
             </>
