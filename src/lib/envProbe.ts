@@ -18,6 +18,13 @@ export interface BridgeInfo {
   device?: 'cpu' | 'metal' | 'cuda';
 }
 
+export interface WebGPUInfo {
+  available: boolean;
+  supported: boolean;
+  reason?: string;
+  adapter?: string;
+}
+
 export interface CachedModels {
   tiny: boolean;
   base: boolean;
@@ -29,6 +36,7 @@ export interface EnvironmentProbe {
   device: DeviceInfo;
   bridge: BridgeInfo;
   cached: CachedModels;
+  webgpu: WebGPUInfo;
   timestamp: number;
 }
 
@@ -78,20 +86,41 @@ export function getDeviceClass(): { class: 'mobile' | 'laptop' | 'desktop', memo
   const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
   const isTablet = /ipad|tablet|kindle/.test(userAgent);
   
-  // @ts-ignore - Device Memory API is experimental
-  const deviceMemory = (navigator as any).deviceMemory || 4; // GB fallback
+  // @ts-ignore - Device Memory API is experimental (capped at 8GB for privacy)
+  const reportedMemory = (navigator as any).deviceMemory || 4;
+  const coreCount = navigator.hardwareConcurrency || 4;
   
+  // Améliorer l'estimation pour les Mac M-series
+  let estimatedMemory = reportedMemory;
+  
+  // Détecter Mac M-series qui ont généralement plus de RAM
+  if (/mac|macintosh/.test(userAgent)) {
+    if (/arm64|apple silicon/.test(userAgent) || coreCount >= 8) {
+      // Mac M-series détecté (8+ cores = probablement M1 Pro/Max, M2/M3/M4 avec plus de RAM)
+      if (coreCount >= 10) {
+        estimatedMemory = Math.max(32, reportedMemory); // M3/M4 Pro/Max = 36GB+
+      } else if (coreCount >= 8) {
+        estimatedMemory = Math.max(16, reportedMemory); // M1 Pro/Max, M2 Pro = 16GB+
+      } else {
+        estimatedMemory = Math.max(8, reportedMemory); // M1/M2 base = 8-16GB
+      }
+    }
+  }
+  
+  // Classification d'appareil basée sur les specs améliorées
   let deviceClass: 'mobile' | 'laptop' | 'desktop';
   
   if (isMobile && !isTablet) {
     deviceClass = 'mobile';
-  } else if (isTablet || deviceMemory <= 8) {
+  } else if (isTablet) {
     deviceClass = 'laptop';
+  } else if (estimatedMemory >= 16 && coreCount >= 8) {
+    deviceClass = 'desktop'; // Machine puissante
   } else {
-    deviceClass = 'desktop';
+    deviceClass = 'laptop';
   }
   
-  return { class: deviceClass, memory: deviceMemory };
+  return { class: deviceClass, memory: estimatedMemory };
 }
 
 /**
@@ -141,13 +170,73 @@ export async function detectBridge(): Promise<BridgeInfo> {
 }
 
 /**
+ * Teste WebGPU et fournit des informations détaillées
+ */
+export async function checkWebGPU(): Promise<WebGPUInfo> {
+  try {
+    // Vérifier si WebGPU est disponible dans le navigateur
+    if (!('gpu' in navigator)) {
+      const userAgent = navigator.userAgent.toLowerCase();
+      if (/safari/.test(userAgent) && !/chrome/.test(userAgent)) {
+        return {
+          available: false,
+          supported: false,
+          reason: 'WebGPU disponible mais désactivé. Activez-le dans Develop > Experimental Features > WebGPU'
+        };
+      } else if (/chrome/.test(userAgent)) {
+        return {
+          available: false,
+          supported: false,
+          reason: 'WebGPU disponible mais désactivé. Activez-le dans chrome://flags/#enable-unsafe-webgpu'
+        };
+      } else if (/firefox/.test(userAgent)) {
+        return {
+          available: false,
+          supported: false,
+          reason: 'WebGPU disponible mais désactivé. Activez-le dans about:config → dom.webgpu.enabled'
+        };
+      }
+      return {
+        available: false,
+        supported: false,
+        reason: 'WebGPU non supporté par ce navigateur'
+      };
+    }
+
+    // Tester l'adaptateur WebGPU
+    const gpu = (navigator as any).gpu;
+    const adapter = await gpu.requestAdapter();
+    if (!adapter) {
+      return {
+        available: false,
+        supported: true,
+        reason: 'Aucun adaptateur WebGPU trouvé'
+      };
+    }
+
+    return {
+      available: true,
+      supported: true,
+      adapter: adapter.info?.description || 'Adaptateur WebGPU détecté'
+    };
+  } catch (error) {
+    return {
+      available: false,
+      supported: true,
+      reason: `Erreur WebGPU: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+    };
+  }
+}
+
+/**
  * Sonde complète de l'environnement
  */
 export async function probeEnvironment(): Promise<EnvironmentProbe> {
-  const [bridge, cached, powerState] = await Promise.all([
+  const [bridge, cached, powerState, webgpu] = await Promise.all([
     detectBridge(),
     getCachedModels(),
-    getPowerState()
+    getPowerState(),
+    checkWebGPU()
   ]);
   
   const { class: deviceClass, memory } = getDeviceClass();
@@ -165,6 +254,7 @@ export async function probeEnvironment(): Promise<EnvironmentProbe> {
     device,
     bridge,
     cached,
+    webgpu,
     timestamp: Date.now()
   };
 }

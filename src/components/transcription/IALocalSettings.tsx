@@ -17,12 +17,14 @@ import {
   Zap,
   Monitor,
   Laptop,
-  Smartphone
+  Smartphone,
+  Wifi,
+  Server
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { WhisperModel } from '@/lib/whisperService';
 import type { EnvironmentProbe } from '@/lib/envProbe';
-import { probeEnvironment } from '@/lib/envProbe';
+import { probeEnvironment, checkWebGPU } from '@/lib/envProbe';
 import { getAvailableModelsWithRecommendation } from '@/lib/modelRecommendation';
 import { modelDownloadService, formatBytes, type DownloadProgress } from '@/lib/modelDownloadService';
 import { getTranscriptionDB } from '@/lib/transcriptionStorage';
@@ -205,17 +207,41 @@ export const IALocalSettings = () => {
   };
 
   const handleTestBridge = async () => {
-    await loadEnvironmentAndPreferences();
-    
-    if (environment?.bridge.available) {
+    try {
+      // Test bridge connection
+      const response = await fetch('http://127.0.0.1:27123/status');
+      if (response.ok) {
+        toast({
+          title: "Bridge connecté",
+          description: "Le bridge local fonctionne correctement"
+        });
+      } else {
+        toast({
+          title: "Bridge déconnecté",
+          description: "Le bridge local n'est pas accessible",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Bridge disponible",
-        description: `Bridge local détecté sur ${environment.bridge.device?.toUpperCase()}`,
+        title: "Erreur bridge",
+        description: "Impossible de se connecter au bridge local",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTestWebGPU = async () => {
+    const webgpuInfo = await checkWebGPU();
+    if (webgpuInfo.available) {
+      toast({
+        title: "WebGPU activé",
+        description: webgpuInfo.adapter || "WebGPU fonctionne correctement"
       });
     } else {
       toast({
-        title: "Bridge indisponible",
-        description: "Le bridge local n'est pas accessible",
+        title: "WebGPU désactivé",
+        description: webgpuInfo.reason || "WebGPU non disponible",
         variant: "destructive"
       });
     }
@@ -256,6 +282,22 @@ export const IALocalSettings = () => {
           <Button
             variant="outline"
             size="sm"
+            onClick={handleTestWebGPU}
+          >
+            <Monitor className="h-4 w-4 mr-2" />
+            Test WebGPU
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestBridge}
+          >
+            <Server className="h-4 w-4 mr-2" />
+            Test Bridge
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={loadEnvironmentAndPreferences}
             disabled={refreshing}
           >
@@ -282,7 +324,29 @@ export const IALocalSettings = () => {
                   <div className="font-medium capitalize">{environment.device.class}</div>
                   <div className="text-sm text-muted-foreground">
                     {environment.device.memory}GB RAM
+                    {environment.device.memory > 16 && (
+                      <span className="text-green-600 ml-1">(Mac M-series détecté)</span>
+                    )}
                   </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className={`w-2 h-2 rounded-full ${
+                  environment.webgpu?.available ? 'bg-success' : 'bg-muted'
+                }`}></div>
+                <div>
+                  <div className="font-medium">
+                    WebGPU {environment.webgpu?.available ? 'Activé' : 'Désactivé'}
+                  </div>
+                  {environment.webgpu?.reason && !environment.webgpu.available && (
+                    <div className="text-xs text-amber-600 dark:text-amber-400">
+                      {environment.webgpu.reason.length > 50 
+                        ? environment.webgpu.reason.substring(0, 50) + '...'
+                        : environment.webgpu.reason
+                      }
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -301,7 +365,9 @@ export const IALocalSettings = () => {
                   )}
                 </div>
               </div>
-              
+            </div>
+            
+            <div className="mt-4 pt-4 border-t flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <HardDrive className="h-4 w-4 text-muted-foreground" />
                 <div>
@@ -311,10 +377,8 @@ export const IALocalSettings = () => {
                   </div>
                 </div>
               </div>
-            </div>
-            
-            {environment.bridge.available && (
-              <div className="mt-4 pt-4 border-t">
+              
+              {environment.bridge.available && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -324,8 +388,8 @@ export const IALocalSettings = () => {
                   <Zap className="h-4 w-4 mr-2" />
                   Tester le bridge
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
