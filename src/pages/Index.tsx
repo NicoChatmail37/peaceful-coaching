@@ -60,8 +60,10 @@ const Index = () => {
           <JourView />
         ) : activeTopTab === 'catalogue' ? (
           <CatalogueView />
-        ) : (
+        ) : activeTopTab === 'settings' ? (
           <TechnicalSettingsView />
+        ) : (
+          <JourView />
         )}
       </div>
     </div>
