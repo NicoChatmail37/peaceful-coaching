@@ -428,7 +428,14 @@ export const IALocalSettings = () => {
                       <div className="text-xs text-muted-foreground mt-1">
                         Téléchargement... {Math.round(model.progress)}%
                         {model.downloadError && (
-                          <div className="text-amber-600 dark:text-amber-400 mt-1">
+                          <div className={`mt-1 ${
+                            model.downloadError?.includes('WebGPU indisponible') ||
+                            model.downloadError?.includes('Mode CPU') ||
+                            model.downloadError?.includes('🐌') ||
+                            model.downloadError?.includes('🚀')
+                              ? 'text-blue-600 dark:text-blue-400' 
+                              : 'text-amber-600 dark:text-amber-400'
+                          }`}>
                             {model.downloadError}
                           </div>
                         )}

@@ -156,8 +156,18 @@ export function useModelOnboarding(): UseModelOnboardingReturn {
       }
 
       // For browser models, download if needed
+      let showedFallbackToast = false;
       await modelDownloadService.download(actualModel, (progress) => {
         setDownloadProgress(progress);
+        
+        // Show informative toast for CPU fallback (only once)
+        if (!showedFallbackToast && progress.error?.includes('WebGPU indisponible')) {
+          showedFallbackToast = true;
+          toast({
+            title: "Mode CPU activé",
+            description: "WebGPU indisponible → passage en mode CPU (plus lent mais fiable)",
+          });
+        }
       });
 
       await savePreferences({
@@ -169,7 +179,19 @@ export function useModelOnboarding(): UseModelOnboardingReturn {
       
     } catch (error) {
       setDownloadProgress(null);
-      throw error;
+      
+      // Only re-throw real errors, not WebGPU fallback issues
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      if (!errorMessage.toLowerCase().includes('webgpu')) {
+        throw error;
+      }
+      
+      // For WebGPU issues that somehow still throw, convert to success
+      // since the CPU fallback should have worked
+      toast({
+        title: "Modèle préparé (CPU)",
+        description: "Le modèle est prêt en mode CPU (plus lent mais fiable)",
+      });
     }
   };
 

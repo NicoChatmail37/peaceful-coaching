@@ -151,25 +151,38 @@ class ModelDownloadService implements ModelDownloadManager {
     const { pipeline } = await import('@huggingface/transformers');
     const modelName = `onnx-community/whisper-${model}.en`;
 
-    // Try WebGPU first, fallback to CPU
-    const deviceConfigs = [
-      { device: 'webgpu' as const, dtype: 'fp16' as const, description: 'WebGPU' },
-      { device: 'cpu' as const, dtype: 'fp32' as const, description: 'CPU' }
-    ];
+    // Check WebGPU availability first
+    const webGPUAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
+    
+    // Decide device configuration based on availability
+    const deviceConfigs = webGPUAvailable 
+      ? [
+          { device: 'webgpu' as const, dtype: 'fp16' as const, description: '🚀 GPU', mode: 'gpu' },
+          { device: 'cpu' as const, dtype: 'fp32' as const, description: '🐌 CPU', mode: 'cpu' }
+        ]
+      : [
+          { device: 'cpu' as const, dtype: 'fp32' as const, description: '🐌 CPU', mode: 'cpu' }
+        ];
 
     let lastError: Error | null = null;
+    let usedDevice: string = '';
 
     for (const config of deviceConfigs) {
       if (signal.aborted) return;
 
       try {
+        // Update progress with device info
         this.updateProgress(model, {
           model,
-          progress: 15,
+          progress: config.device === 'cpu' ? 20 : 15,
           status: 'downloading',
           bytesLoaded: 0,
           bytesTotal: this.getModelSize(model),
-          error: config.device === 'cpu' ? 'WebGPU non supporté, utilisation CPU...' : undefined
+          error: config.device === 'cpu' && webGPUAvailable 
+            ? 'WebGPU indisponible → passage en mode CPU (plus lent)'
+            : config.device === 'cpu' && !webGPUAvailable
+            ? 'Mode CPU (WebGPU non supporté sur ce navigateur)'
+            : undefined
         });
 
         // Create pipeline - this will download and cache the model
@@ -183,39 +196,59 @@ class ModelDownloadService implements ModelDownloadManager {
               if (signal.aborted) return;
               
               // Progress from transformers.js
-              const baseProgress = config.device === 'cpu' ? 20 : 15;
-              const progressPercent = Math.min(90, baseProgress + (progress.progress || 0) * 70);
+              const baseProgress = config.device === 'cpu' ? 25 : 20;
+              const progressPercent = Math.min(90, baseProgress + (progress.progress || 0) * 65);
               this.updateProgress(model, {
                 model,
                 progress: progressPercent,
                 status: 'downloading',
                 bytesLoaded: Math.floor((progressPercent / 100) * this.getModelSize(model)),
                 bytesTotal: this.getModelSize(model),
-                error: config.device === 'cpu' ? `Mode CPU activé (${config.description})` : undefined
+                error: `Téléchargement en cours (${config.description})`
               });
             }
           }
         );
 
-        // Store preference that model is ready
-        await this.markModelAsReady(model);
+        usedDevice = config.description;
+        
+        // Store preference that model is ready with device info
+        await this.markModelAsReady(model, config.mode);
         
         // Clean up pipeline reference
         pipe.dispose?.();
+        
+        // Success message based on device used
+        this.updateProgress(model, {
+          model,
+          progress: 95,
+          status: 'downloading',
+          bytesLoaded: Math.floor(0.95 * this.getModelSize(model)),
+          bytesTotal: this.getModelSize(model),
+          error: `Modèle prêt (${config.description})`
+        });
+        
         return; // Success
         
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(`Failed with ${config.description}`);
         console.warn(`Model download failed with ${config.description}:`, error);
         
-        // If this is not the last config, continue to next
-        if (config !== deviceConfigs[deviceConfigs.length - 1]) {
+        // Special handling for WebGPU errors - don't treat as fatal
+        if (config.device === 'webgpu' && deviceConfigs.length > 1) {
+          // Continue to CPU fallback
           continue;
+        }
+        
+        // If this is the last config or CPU also failed, this is a real error
+        if (config === deviceConfigs[deviceConfigs.length - 1]) {
+          // Only throw if CPU also failed - this means there's a real problem
+          throw lastError;
         }
       }
     }
 
-    // If we get here, all device configs failed
+    // This should never be reached due to the logic above
     throw lastError || new Error('Failed to download model with any device configuration');
   }
 
@@ -230,12 +263,17 @@ class ModelDownloadService implements ModelDownloadManager {
     }
   }
 
-  private async markModelAsReady(model: WhisperModel): Promise<void> {
+  private async markModelAsReady(model: WhisperModel, device: string = 'unknown'): Promise<void> {
     try {
       const db = await getTranscriptionDB();
       await db.put('prefs', {
         key: `model_${model}_ready`,
         value: true
+      });
+      // Also store the device used
+      await db.put('prefs', {
+        key: `model_${model}_device`,
+        value: device
       });
     } catch (error) {
       console.warn('Failed to mark model as ready:', error);
@@ -260,10 +298,6 @@ class ModelDownloadService implements ModelDownloadManager {
       return 'Erreur réseau : Vérifiez votre connexion internet et réessayez';
     }
     
-    if (message.includes('webgpu') || message.includes('gpu')) {
-      return 'WebGPU non supporté : Téléchargement en mode CPU (plus lent)';
-    }
-    
     if (message.includes('memory') || message.includes('quota')) {
       return 'Mémoire insuffisante : Essayez un modèle plus petit (tiny ou base)';
     }
@@ -276,6 +310,7 @@ class ModelDownloadService implements ModelDownloadManager {
       return 'Téléchargement annulé par l\'utilisateur';
     }
     
+    // For real failures (not WebGPU fallback)
     return `Erreur de téléchargement : ${error.message}`;
   }
 

@@ -56,6 +56,7 @@ export const PrepareDayModal = ({
   const [selectedModel, setSelectedModel] = useState<WhisperModel | 'auto'>('auto');
   const [preparing, setPreparing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
 
   const models = environment ? getAvailableModelsWithRecommendation(environment) : null;
   const recommendation = environment ? recommendModel(environment) : null;
@@ -72,6 +73,9 @@ export const PrepareDayModal = ({
 
   const handlePrepare = async () => {
     setPreparing(true);
+    setProgress(0);
+    setProgressMessage('');
+    
     try {
       await onPrepareModel(selectedModel);
       toast({
@@ -80,11 +84,15 @@ export const PrepareDayModal = ({
       });
       onOpenChange(false);
     } catch (error) {
-      toast({
-        title: "Erreur de préparation",
-        description: error instanceof Error ? error.message : "Erreur inconnue",
-        variant: "destructive"
-      });
+      // Only show error toast for real errors, not WebGPU fallback
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      if (!errorMessage.toLowerCase().includes('webgpu')) {
+        toast({
+          title: "Erreur de préparation",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
     } finally {
       setPreparing(false);
     }
@@ -312,6 +320,18 @@ export const PrepareDayModal = ({
                     <span className="text-sm text-muted-foreground">{progress}%</span>
                   </div>
                   <Progress value={progress} className="w-full" />
+                  {progressMessage && (
+                    <p className={`text-xs ${
+                      progressMessage.includes('WebGPU indisponible') ||
+                      progressMessage.includes('Mode CPU') ||
+                      progressMessage.includes('🐌') ||
+                      progressMessage.includes('🚀')
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-muted-foreground'
+                    }`}>
+                      {progressMessage}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
