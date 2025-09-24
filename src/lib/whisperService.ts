@@ -58,13 +58,14 @@ export async function initWhisper(model: WhisperModel = 'tiny', onProgress?: (pr
     );
     currentModel = model;
   } catch (error) {
-    // Fallback to CPU if WebGPU fails
-    console.warn('WebGPU failed, falling back to CPU:', error);
+    // Fallback to WASM if WebGPU fails
+    console.warn('WebGPU failed, falling back to WASM:', error);
     whisperPipeline = await pipeline(
       'automatic-speech-recognition',
       modelName,
       {
-        device: 'cpu',
+        device: 'wasm',
+        dtype: 'fp32',
       }
     );
     currentModel = model;

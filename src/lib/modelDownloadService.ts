@@ -158,10 +158,10 @@ class ModelDownloadService implements ModelDownloadManager {
     const deviceConfigs = webGPUAvailable 
       ? [
           { device: 'webgpu' as const, dtype: 'fp16' as const, description: '🚀 GPU', mode: 'gpu' },
-          { device: 'cpu' as const, dtype: 'fp32' as const, description: '🐌 CPU', mode: 'cpu' }
+          { device: 'wasm' as const, dtype: 'fp32' as const, description: '🐌 WASM', mode: 'wasm' }
         ]
       : [
-          { device: 'cpu' as const, dtype: 'fp32' as const, description: '🐌 CPU', mode: 'cpu' }
+          { device: 'wasm' as const, dtype: 'fp32' as const, description: '🐌 WASM', mode: 'wasm' }
         ];
 
     let lastError: Error | null = null;
@@ -174,14 +174,14 @@ class ModelDownloadService implements ModelDownloadManager {
         // Update progress with device info
         this.updateProgress(model, {
           model,
-          progress: config.device === 'cpu' ? 20 : 15,
+          progress: config.device === 'wasm' ? 20 : 15,
           status: 'downloading',
           bytesLoaded: 0,
           bytesTotal: this.getModelSize(model),
-          error: config.device === 'cpu' && webGPUAvailable 
-            ? 'WebGPU indisponible → passage en mode CPU (plus lent)'
-            : config.device === 'cpu' && !webGPUAvailable
-            ? 'Mode CPU (WebGPU non supporté sur ce navigateur)'
+          error: config.device === 'wasm' && webGPUAvailable 
+            ? 'WebGPU indisponible → passage en mode WASM (plus lent)'
+            : config.device === 'wasm' && !webGPUAvailable
+            ? 'Mode WASM (WebGPU non supporté sur ce navigateur)'
             : undefined
         });
 
@@ -196,7 +196,7 @@ class ModelDownloadService implements ModelDownloadManager {
               if (signal.aborted) return;
               
               // Progress from transformers.js
-              const baseProgress = config.device === 'cpu' ? 25 : 20;
+              const baseProgress = config.device === 'wasm' ? 25 : 20;
               const progressPercent = Math.min(90, baseProgress + (progress.progress || 0) * 65);
               this.updateProgress(model, {
                 model,
@@ -236,13 +236,13 @@ class ModelDownloadService implements ModelDownloadManager {
         
         // Special handling for WebGPU errors - don't treat as fatal
         if (config.device === 'webgpu' && deviceConfigs.length > 1) {
-          // Continue to CPU fallback
+          // Continue to WASM fallback
           continue;
         }
         
-        // If this is the last config or CPU also failed, this is a real error
+        // If this is the last config or WASM also failed, this is a real error
         if (config === deviceConfigs[deviceConfigs.length - 1]) {
-          // Only throw if CPU also failed - this means there's a real problem
+          // Only throw if WASM also failed - this means there's a real problem
           throw lastError;
         }
       }
