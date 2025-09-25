@@ -3,13 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import { 
   Mic, 
   Square, 
   Pause, 
   Play, 
   Upload,
-  AlertCircle
+  AlertCircle,
+  Headphones
 } from "lucide-react";
 import { useAudioRecording } from "@/hooks/useAudioRecording";
 import { Input } from "@/components/ui/input";
@@ -25,6 +27,7 @@ export const AudioRecorder = ({ onAudioReady, disabled = false }: AudioRecorderP
     state,
     duration,
     audioLevel,
+    stereoInfo,
     startRecording,
     pauseRecording,
     resumeRecording,
@@ -33,6 +36,7 @@ export const AudioRecorder = ({ onAudioReady, disabled = false }: AudioRecorderP
   } = useAudioRecording();
 
   const [dragOver, setDragOver] = useState(false);
+  const [enableStereo, setEnableStereo] = useState(false);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -93,6 +97,65 @@ export const AudioRecorder = ({ onAudioReady, disabled = false }: AudioRecorderP
       {/* Recording Controls */}
       <Card className="p-4">
         <div className="space-y-4">
+          {/* Stereo Configuration */}
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Headphones className="h-4 w-4" />
+              <div className="flex flex-col">
+                <Label className="text-sm">Mode stéréo (RØDE Wireless Go II)</Label>
+                <span className="text-xs text-muted-foreground">
+                  Dialogue thérapeutique séparé par canal
+                </span>
+              </div>
+            </div>
+            <Switch
+              checked={enableStereo}
+              onCheckedChange={setEnableStereo}
+              disabled={disabled || state !== 'idle'}
+            />
+          </div>
+
+          {/* Stereo Status Indicators */}
+          {enableStereo && (
+            <div className="flex items-center gap-4 p-3 bg-background border rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-medium">Canal L</span>
+                  <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 transition-all"
+                      style={{ width: `${stereoInfo.leftLevel * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">Thérapeute</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-medium">Canal R</span>
+                  <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-green-500 transition-all"
+                      style={{ width: `${stereoInfo.rightLevel * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">Client</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col text-xs text-muted-foreground">
+                <span>Canaux: {stereoInfo.channelCount}</span>
+                <span className={stereoInfo.webGpuAvailable ? "text-green-600" : "text-orange-600"}>
+                  {stereoInfo.webGpuAvailable ? "WebGPU OK" : "CPU mode"}
+                </span>
+                <span className={stereoInfo.browserOptimal ? "text-green-600" : "text-orange-600"}>
+                  {stereoInfo.browserOptimal ? "Chrome/Edge" : "Autre navigateur"}
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Badge variant={state === 'recording' ? 'default' : 'secondary'}>
@@ -118,13 +181,13 @@ export const AudioRecorder = ({ onAudioReady, disabled = false }: AudioRecorderP
           <div className="flex gap-2">
             {state === 'idle' && (
               <Button 
-                onClick={startRecording} 
+                onClick={() => startRecording(enableStereo)} 
                 disabled={disabled}
                 size="sm"
                 className="flex items-center gap-2"
               >
                 <Mic className="h-4 w-4" />
-                Démarrer
+                Démarrer {enableStereo ? 'Stéréo' : ''}
               </Button>
             )}
             

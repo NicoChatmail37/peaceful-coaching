@@ -3,11 +3,21 @@ import { toast } from '@/hooks/use-toast';
 
 export type RecordingState = 'idle' | 'recording' | 'paused' | 'processing';
 
+export interface StereoInfo {
+  isStereo: boolean;
+  channelCount: number;
+  leftLevel: number;
+  rightLevel: number;
+  webGpuAvailable: boolean;
+  browserOptimal: boolean;
+}
+
 export interface AudioRecordingHook {
   state: RecordingState;
   duration: number;
   audioLevel: number;
-  startRecording: () => Promise<void>;
+  stereoInfo: StereoInfo;
+  startRecording: (enableStereo?: boolean) => Promise<void>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   stopRecording: () => Promise<Blob | null>;
@@ -18,6 +28,14 @@ export function useAudioRecording(): AudioRecordingHook {
   const [state, setState] = useState<RecordingState>('idle');
   const [duration, setDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [stereoInfo, setStereoInfo] = useState<StereoInfo>({
+    isStereo: false,
+    channelCount: 1,
+    leftLevel: 0,
+    rightLevel: 0,
+    webGpuAvailable: false,
+    browserOptimal: false
+  });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -25,13 +43,36 @@ export function useAudioRecording(): AudioRecordingHook {
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
+  const splitterRef = useRef<ChannelSplitterNode | null>(null);
+  const leftAnalyzerRef = useRef<AnalyserNode | null>(null);
+  const rightAnalyzerRef = useRef<AnalyserNode | null>(null);
   const levelIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const isSupported = typeof navigator !== 'undefined' && 
                      !!navigator.mediaDevices?.getUserMedia &&
                      !!window.MediaRecorder;
 
-  const startRecording = useCallback(async () => {
+  // Check WebGPU availability
+  const checkWebGPU = useCallback(async () => {
+    try {
+      if ('gpu' in navigator) {
+        const adapter = await (navigator as any).gpu?.requestAdapter();
+        return !!adapter;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Check browser optimization for stereo
+  const checkBrowserOptimal = useCallback(() => {
+    const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+    const isEdge = /Edg/.test(navigator.userAgent);
+    return isChrome || isEdge;
+  }, []);
+
+  const startRecording = useCallback(async (enableStereo = false) => {
     if (!isSupported) {
       toast({
         title: "Non supporté",
@@ -42,21 +83,65 @@ export function useAudioRecording(): AudioRecordingHook {
     }
 
     try {
+      // Check capabilities
+      const webGpuAvailable = await checkWebGPU();
+      const browserOptimal = checkBrowserOptimal();
+
+      // Show WebGPU fallback message if needed
+      if (!webGpuAvailable && enableStereo) {
+        toast({
+          title: "WebGPU indisponible",
+          description: "Utilisation du CPU (plus lent). Pour de meilleures performances, utilisez Chrome/Edge.",
+          variant: "default"
+        });
+      }
+
+      // Show browser recommendation
+      if (enableStereo && !browserOptimal) {
+        toast({
+          title: "Recommandation",
+          description: "Chrome/Edge recommandés pour une meilleure qualité stéréo",
+          variant: "default"
+        });
+      }
+
+      // Audio constraints with stereo optimization
+      const audioConstraints: MediaTrackConstraints = enableStereo ? {
+        echoCancellation: false,
+        autoGainControl: false,
+        noiseSuppression: false,
+        channelCount: 2,
+        sampleRate: 48000
+      } : {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      };
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        }
+        audio: audioConstraints
       });
+
+      // Check actual channel count
+      const track = stream.getAudioTracks()[0];
+      const settings = track.getSettings();
+      const actualChannels = settings.channelCount || 1;
+      const isStereo = enableStereo && actualChannels >= 2;
+
+      if (enableStereo && actualChannels < 2) {
+        toast({
+          title: "Stéréo non disponible",
+          description: "Vérifiez que votre RØDE est configuré en stéréo dans les paramètres système",
+          variant: "default"
+        });
+      }
 
       streamRef.current = stream;
       chunksRef.current = [];
 
-      // Setup MediaRecorder
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Setup MediaRecorder with optimal codec
+      const mimeType = browserOptimal ? 'audio/webm;codecs=opus' : 'audio/webm';
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -64,18 +149,48 @@ export function useAudioRecording(): AudioRecordingHook {
         }
       };
 
-      mediaRecorder.start(1000); // Collect data every second
+      mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
 
-      // Setup audio level monitoring
-      const audioContext = new AudioContext();
+      // Setup audio analysis
+      const audioContext = new AudioContext({ sampleRate: 48000 });
       const source = audioContext.createMediaStreamSource(stream);
-      const analyzer = audioContext.createAnalyser();
-      analyzer.fftSize = 256;
-      source.connect(analyzer);
+      
+      if (isStereo) {
+        // Stereo analysis setup
+        const splitter = audioContext.createChannelSplitter(2);
+        const leftAnalyzer = audioContext.createAnalyser();
+        const rightAnalyzer = audioContext.createAnalyser();
+        
+        leftAnalyzer.fftSize = 256;
+        rightAnalyzer.fftSize = 256;
+        
+        source.connect(splitter);
+        splitter.connect(leftAnalyzer, 0);
+        splitter.connect(rightAnalyzer, 1);
+        
+        splitterRef.current = splitter;
+        leftAnalyzerRef.current = leftAnalyzer;
+        rightAnalyzerRef.current = rightAnalyzer;
+      } else {
+        // Mono analysis setup
+        const analyzer = audioContext.createAnalyser();
+        analyzer.fftSize = 256;
+        source.connect(analyzer);
+        analyzerRef.current = analyzer;
+      }
 
       audioContextRef.current = audioContext;
-      analyzerRef.current = analyzer;
+
+      // Update stereo info
+      setStereoInfo({
+        isStereo,
+        channelCount: actualChannels,
+        leftLevel: 0,
+        rightLevel: 0,
+        webGpuAvailable,
+        browserOptimal
+      });
 
       // Start duration counter
       const startTime = Date.now();
@@ -85,19 +200,34 @@ export function useAudioRecording(): AudioRecordingHook {
 
       // Start audio level monitoring
       levelIntervalRef.current = setInterval(() => {
-        if (analyzerRef.current) {
+        if (isStereo && leftAnalyzerRef.current && rightAnalyzerRef.current) {
+          // Stereo level monitoring
+          const leftData = new Uint8Array(leftAnalyzerRef.current.frequencyBinCount);
+          const rightData = new Uint8Array(rightAnalyzerRef.current.frequencyBinCount);
+          
+          leftAnalyzerRef.current.getByteFrequencyData(leftData);
+          rightAnalyzerRef.current.getByteFrequencyData(rightData);
+          
+          const leftLevel = leftData.reduce((sum, value) => sum + value, 0) / leftData.length / 255;
+          const rightLevel = rightData.reduce((sum, value) => sum + value, 0) / rightData.length / 255;
+          
+          setStereoInfo(prev => ({ ...prev, leftLevel, rightLevel }));
+          setAudioLevel(Math.max(leftLevel, rightLevel));
+        } else if (analyzerRef.current) {
+          // Mono level monitoring
           const dataArray = new Uint8Array(analyzerRef.current.frequencyBinCount);
           analyzerRef.current.getByteFrequencyData(dataArray);
-          const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-          setAudioLevel(average / 255); // Normalize to 0-1
+          const level = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length / 255;
+          setAudioLevel(level);
         }
       }, 50);
 
       setState('recording');
       
       toast({
-        title: "Enregistrement démarré",
-        description: "L'enregistrement audio est en cours"
+        title: enableStereo ? "Enregistrement stéréo démarré" : "Enregistrement démarré",
+        description: `Enregistrement ${isStereo ? 'stéréo' : 'mono'} en cours • Enregistrement local uniquement`,
+        variant: "default"
       });
 
     } catch (error) {
@@ -108,7 +238,7 @@ export function useAudioRecording(): AudioRecordingHook {
         variant: "destructive"
       });
     }
-  }, [isSupported]);
+  }, [isSupported, checkWebGPU, checkBrowserOptimal]);
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && state === 'recording') {
@@ -200,6 +330,7 @@ export function useAudioRecording(): AudioRecordingHook {
     state,
     duration,
     audioLevel,
+    stereoInfo,
     startRecording,
     pauseRecording,
     resumeRecording,
