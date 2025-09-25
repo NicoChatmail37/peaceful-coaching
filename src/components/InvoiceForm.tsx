@@ -153,6 +153,7 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
       total: formData.includeTva ? totalWithTva : subtotal,
       notes: formData.notes,
       status: invoiceStatus,
+      client_id: selectedClient?.id,
       clientName: formData.clientName,
       clientAddress: formData.clientAddress,
       clientNPA: formData.clientNPA,

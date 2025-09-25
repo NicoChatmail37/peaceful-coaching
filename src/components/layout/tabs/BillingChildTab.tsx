@@ -7,6 +7,8 @@ import { useInvoices } from "@/hooks/useInvoices";
 import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Invoice } from "@/pages/Index";
+import { InvoicePreview } from "@/components/InvoicePreview";
+import { FullInvoice } from "@/hooks/useInvoices";
 
 interface BillingChildTabProps {
   clientId: string | null;
@@ -15,10 +17,11 @@ interface BillingChildTabProps {
 export const BillingChildTab = ({ clientId }: BillingChildTabProps) => {
   const { invoices, loading } = useInvoices();
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<FullInvoice | null>(null);
 
   // Filter invoices for selected client
   const clientInvoices = invoices.filter(invoice => 
-    clientId && invoice.clientName // Need to match by name for now
+    clientId && invoice.client_id === clientId
   );
 
   const handleInvoiceCreate = (invoice: Invoice) => {
@@ -56,7 +59,13 @@ export const BillingChildTab = ({ clientId }: BillingChildTabProps) => {
           <ScrollArea className="h-[calc(100vh-300px)]">
             <div className="space-y-2">
               {clientInvoices.map((invoice) => (
-                <Card key={invoice.id} className="p-3">
+                <Card 
+                  key={invoice.id} 
+                  className={`p-3 cursor-pointer transition-colors hover:bg-muted/50 ${
+                    selectedInvoice?.id === invoice.id ? 'ring-2 ring-primary' : ''
+                  }`}
+                  onClick={() => setSelectedInvoice(invoice)}
+                >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">{invoice.number}</span>
@@ -95,7 +104,7 @@ export const BillingChildTab = ({ clientId }: BillingChildTabProps) => {
         </div>
       </div>
 
-      {/* Colonne droite : Formulaire de facture */}
+      {/* Colonne droite : Formulaire ou prévisualisation */}
       <div className="flex-1 overflow-hidden">
         {showInvoiceForm ? (
           <ScrollArea className="h-full">
@@ -111,6 +120,50 @@ export const BillingChildTab = ({ clientId }: BillingChildTabProps) => {
               </div>
               
               <InvoiceForm onInvoiceCreate={handleInvoiceCreate} />
+            </div>
+          </ScrollArea>
+        ) : selectedInvoice ? (
+          <ScrollArea className="h-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">Aperçu de la facture</h2>
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedInvoice(null)}
+                >
+                  Fermer
+                </Button>
+              </div>
+              
+              <InvoicePreview 
+                invoice={{
+                  id: selectedInvoice.id || '',
+                  number: selectedInvoice.number,
+                  date: selectedInvoice.date,
+                  dueDate: selectedInvoice.due_date,
+                  clientName: selectedInvoice.clientName,
+                  clientAddress: selectedInvoice.clientAddress,
+                  clientNPA: selectedInvoice.clientNPA,
+                  clientCity: selectedInvoice.clientCity,
+                  items: selectedInvoice.items.map(item => ({
+                    description: item.description,
+                    quantity: item.quantity,
+                    price: item.unit_price,
+                    total: item.total
+                  })),
+                  total: selectedInvoice.subtotal,
+                  tva: selectedInvoice.tva_amount,
+                  totalWithTva: selectedInvoice.total,
+                  notes: selectedInvoice.notes || '',
+                  status: selectedInvoice.status
+                }}
+                onInvoiceStatusUpdate={(invoice, status) => {
+                  // Update the selected invoice status
+                  if (selectedInvoice) {
+                    setSelectedInvoice({ ...selectedInvoice, status });
+                  }
+                }}
+              />
             </div>
           </ScrollArea>
         ) : (
