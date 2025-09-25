@@ -26,6 +26,9 @@ import {
   Sparkles
 } from "lucide-react";
 import { AudioRecorder } from "./AudioRecorder";
+import { DialogueTranscript } from "./DialogueTranscript";
+import { useDialogueTranscript } from "@/hooks/useDialogueTranscript";
+import { useAudioRecording } from "@/hooks/useAudioRecording";
 import { 
   transcribeAudio, 
   getModelInfo, 
@@ -78,6 +81,9 @@ export const TranscriptionPanel = ({
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
   const [checkingBridge, setCheckingBridge] = useState(false);
   
+  // Audio recording for stereo detection
+  const { stereoInfo } = useAudioRecording();
+  
   // LLM related state
   const [llmBridgeStatus, setLlmBridgeStatus] = useState<LLMBridgeStatus | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
@@ -85,6 +91,12 @@ export const TranscriptionPanel = ({
   const [aiStreamContent, setAiStreamContent] = useState<string>('');
   const [currentAINotes, setCurrentAINotes] = useState<AINote[]>([]);
   const [selectedAIType, setSelectedAIType] = useState<'summary' | 'todos' | 'notes'>('summary');
+
+  // Dialogue processing
+  const { messages: dialogueMessages, stats: dialogueStats, isReliable } = useDialogueTranscript(
+    currentSegments,
+    stereoInfo
+  );
 
   const modelInfo = getModelInfo(selectedModel);
   const availableModels = getAvailableModels(!!bridgeStatus);
@@ -473,6 +485,7 @@ export const TranscriptionPanel = ({
           <TabsList className="mx-4 mt-4">
             <TabsTrigger value="record">Enregistrer</TabsTrigger>
             <TabsTrigger value="transcript">Résultat</TabsTrigger>
+            <TabsTrigger value="dialogue">Dialogue</TabsTrigger>
             <TabsTrigger value="history">Historique</TabsTrigger>
           </TabsList>
 
@@ -715,6 +728,62 @@ export const TranscriptionPanel = ({
                   <AlertCircle className="h-8 w-8 mx-auto mb-2" />
                   <p>Aucun transcript disponible</p>
                   <p className="text-sm">Enregistrez ou importez un audio puis transcrivez-le</p>
+                </div>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="dialogue" className="flex-1 px-4 pb-4 flex flex-col">
+            {currentSegments.length > 0 ? (
+              <div className="space-y-4 flex-1 flex flex-col">
+                {/* Stereo Status Info */}
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={stereoInfo.isStereo ? "default" : "secondary"}>
+                        {stereoInfo.isStereo ? `Stéréo ${stereoInfo.channelCount}CH` : "Mono"}
+                      </Badge>
+                      {dialogueStats.stereoDetected && (
+                        <Badge variant={isReliable ? "default" : "outline"}>
+                          Conf: {Math.round(dialogueStats.avgConfidence * 100)}%
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {dialogueStats.therapistCount} Thérapeute • {dialogueStats.clientCount} Client
+                    </div>
+                  </div>
+                  
+                  {!stereoInfo.isStereo && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      💡 Utilisez un micro stéréo (ex: RØDE) pour la séparation automatique des interlocuteurs
+                    </p>
+                  )}
+                  
+                  {stereoInfo.isStereo && !isReliable && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      ⚠️ Attribution des speakers incertaine - vérifiez les résultats
+                    </p>
+                  )}
+                </Card>
+
+                {/* Dialogue Messages */}
+                <DialogueTranscript 
+                  messages={dialogueMessages}
+                  onCopyMessage={(text) => handleCopyToClipboard(text)}
+                  onUseMessage={(text) => onTranscriptReady(text)}
+                />
+              </div>
+            ) : (
+              <Card className="p-8">
+                <div className="text-center text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                  <p>Aucun dialogue disponible</p>
+                  <p className="text-sm">Transcrivez un audio pour voir la séparation par interlocuteur</p>
+                  <div className="mt-4 space-y-1 text-xs">
+                    <p>🎙️ Audio stéréo recommandé pour de meilleurs résultats</p>
+                    <p>🔒 Traitement 100% local - aucune donnée envoyée</p>
+                  </div>
                 </div>
               </Card>
             )}
