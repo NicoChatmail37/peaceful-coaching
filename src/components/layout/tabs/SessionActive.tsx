@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Save, FileText, Clock, CheckCircle, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { CompactRecordingBar } from "@/components/transcription/CompactRecordingBar";
+import { GlobalSessionReport } from "@/components/transcription/GlobalSessionReport";
 
 interface SessionActiveProps {
   sessionId: string;
@@ -140,6 +142,21 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
         )}
       </div>
 
+      {/* Barre d'enregistrement compacte */}
+      <div className="border-b border-border">
+        <CompactRecordingBar
+          sessionId={sessionId}
+          clientId={clientId}
+          onTranscriptUpdate={(text) => {
+            setTranscriptText(prev => prev + (prev ? '\n' : '') + text);
+          }}
+          onSummaryGenerated={(summary) => {
+            setNotes(prev => prev + (prev ? '\n\n' : '') + '**Résumé automatique:**\n' + summary);
+          }}
+          disabled={session.status === 'done'}
+        />
+      </div>
+
       {/* Contenu de la séance */}
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
@@ -181,6 +198,17 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
               disabled={session.status === 'done'}
             />
           </div>
+
+          <Separator />
+
+          {/* Rapport global de séance */}
+          <GlobalSessionReport
+            transcript={transcriptText}
+            notes={notes}
+            sessionTitle={title}
+            patientName={clientId} // À améliorer avec le vrai nom du patient
+            sessionDate={new Date(session.created_at).toISOString()}
+          />
         </div>
       </ScrollArea>
     </div>

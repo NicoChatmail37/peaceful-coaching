@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Play, Plus, History, Clock } from "lucide-react";
-import { TranscriptionPanel } from "@/components/transcription/TranscriptionPanel";
 import { useSessions } from "@/hooks/useSessions";
 import { SessionActive } from "./SessionActive";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -134,27 +133,10 @@ export const SessionsChildTab = ({ clientId }: SessionsChildTabProps) => {
       {/* Colonne droite : Contenu de la séance */}
       <div className="flex-1 overflow-hidden">
         {activeSessionId ? (
-          <div className="h-full grid grid-rows-2">
-            {/* Partie haute : Séance active */}
-            <div className="border-b border-border">
-              <SessionActive 
-                sessionId={activeSessionId}
-                clientId={clientId}
-              />
-            </div>
-            
-            {/* Partie basse : Transcription */}
-            <div>
-              <TranscriptionPanel
-                sessionId={activeSessionId}
-                clientId={clientId}
-                onTranscriptReady={(text) => {
-                  // Callback pour intégrer le transcript dans la séance
-                  console.log('Transcript ready:', text);
-                }}
-              />
-            </div>
-          </div>
+          <SessionActive 
+            sessionId={activeSessionId}
+            clientId={clientId}
+          />
         ) : (
           <div className="h-full flex items-center justify-center text-muted-foreground">
             <div className="text-center space-y-2">
