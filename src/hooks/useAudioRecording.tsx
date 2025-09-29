@@ -155,7 +155,7 @@ export function useAudioRecording(): AudioRecordingHook {
         }
       };
 
-      mediaRecorder.start(1000);
+      mediaRecorder.start(5000); // Record in 5-second chunks for better transcription
       mediaRecorderRef.current = mediaRecorder;
 
       // Setup audio analysis

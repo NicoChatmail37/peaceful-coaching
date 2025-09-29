@@ -43,10 +43,16 @@ export const useRealTimeTranscription = ({
     try {
       setProgress(30);
       
+      // Validate chunk size (minimum 1KB and 2 seconds estimated)
+      if (audioBlob.size < 1000) {
+        console.log('Chunk too small, skipping:', audioBlob.size, 'bytes');
+        return;
+      }
+
       // Transcribe the chunk
       const result = await transcribeAudio(audioBlob, {
         model: 'tiny', // Use fastest model for real-time
-        language: 'fr',
+        language: 'en', // Changed from 'fr' to match tiny.en model
         mode: 'auto',
         onProgress: (p) => setProgress(30 + (p * 0.4))
       });
@@ -92,9 +98,12 @@ export const useRealTimeTranscription = ({
 
     } catch (error) {
       console.error('Real-time transcription error:', error);
+      console.error('Chunk size:', audioBlob.size, 'bytes');
+      console.error('Chunk type:', audioBlob.type);
+      
       toast({
         title: "Erreur de transcription",
-        description: "Impossible de transcrire le segment audio",
+        description: `Impossible de transcrire le segment audio: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
         variant: "destructive"
       });
       setProgress(0);
