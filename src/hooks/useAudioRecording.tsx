@@ -17,7 +17,7 @@ export interface AudioRecordingHook {
   duration: number;
   audioLevel: number;
   stereoInfo: StereoInfo;
-  startRecording: (enableStereo?: boolean) => Promise<void>;
+  startRecording: (enableStereo?: boolean, onAudioChunk?: (blob: Blob) => void) => Promise<void>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   stopRecording: () => Promise<Blob | null>;
@@ -47,6 +47,7 @@ export function useAudioRecording(): AudioRecordingHook {
   const leftAnalyzerRef = useRef<AnalyserNode | null>(null);
   const rightAnalyzerRef = useRef<AnalyserNode | null>(null);
   const levelIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const onAudioChunkRef = useRef<((blob: Blob) => void) | null>(null);
 
   const isSupported = typeof navigator !== 'undefined' && 
                      !!navigator.mediaDevices?.getUserMedia &&
@@ -72,7 +73,8 @@ export function useAudioRecording(): AudioRecordingHook {
     return isChrome || isEdge;
   }, []);
 
-  const startRecording = useCallback(async (enableStereo = false) => {
+  const startRecording = useCallback(async (enableStereo = false, onAudioChunk?: (blob: Blob) => void) => {
+    onAudioChunkRef.current = onAudioChunk || null;
     if (!isSupported) {
       toast({
         title: "Non supporté",
@@ -146,6 +148,10 @@ export function useAudioRecording(): AudioRecordingHook {
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
+          // Call real-time transcription callback if provided
+          if (onAudioChunkRef.current && event.data.size > 0) {
+            onAudioChunkRef.current(event.data);
+          }
         }
       };
 

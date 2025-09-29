@@ -49,6 +49,7 @@ export const CompactRecordingBar = ({
   const {
     isTranscribing,
     progress,
+    processAudioChunk,
     startRealTimeTranscription,
     stopRealTimeTranscription,
     generateContextualSummary,
@@ -68,8 +69,8 @@ export const CompactRecordingBar = ({
   };
 
   const handleStart = async () => {
-    await startRecording(enableStereo);
     startRealTimeTranscription();
+    await startRecording(enableStereo, processAudioChunk);
   };
 
   const handleStop = async () => {

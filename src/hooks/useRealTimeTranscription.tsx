@@ -9,7 +9,6 @@ interface UseRealTimeTranscriptionProps {
   clientId: string;
   onTranscriptUpdate: (text: string) => void;
   stereoMode?: boolean;
-  chunkDurationMs?: number; // Durée des chunks en ms (default: 10000 = 10s)
 }
 
 interface UseRealTimeTranscriptionResult {
@@ -17,6 +16,7 @@ interface UseRealTimeTranscriptionResult {
   progress: number;
   currentTranscript: string;
   isGeneratingSummary: boolean;
+  processAudioChunk: (blob: Blob) => Promise<void>;
   startRealTimeTranscription: () => void;
   stopRealTimeTranscription: () => void;
   generateContextualSummary: () => Promise<string | null>;
@@ -27,17 +27,13 @@ export const useRealTimeTranscription = ({
   sessionId,
   clientId,
   onTranscriptUpdate,
-  stereoMode = false,
-  chunkDurationMs = 10000
+  stereoMode = false
 }: UseRealTimeTranscriptionProps): UseRealTimeTranscriptionResult => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
-  const audioChunksRef = useRef<Blob[]>([]);
-  const transcriptionIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const isActiveRef = useRef(false);
   const lastSummaryPositionRef = useRef(0);
 
@@ -57,7 +53,8 @@ export const useRealTimeTranscription = ({
 
       setProgress(80);
 
-      let transcriptText = result.text;
+      let transcriptText = result.text.trim();
+      if (!transcriptText) return; // Skip empty transcriptions
 
       // Format as dialogue if stereo mode
       if (stereoMode && result.segments) {
@@ -104,40 +101,20 @@ export const useRealTimeTranscription = ({
     }
   }, [currentTranscript, onTranscriptUpdate, sessionId, clientId, stereoMode]);
 
-  const startChunkedTranscription = useCallback(() => {
-    transcriptionIntervalRef.current = setInterval(async () => {
-      if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
-        return;
-      }
-
-      // Trigger dataavailable event to get current chunk
-      mediaRecorderRef.current.requestData();
-    }, chunkDurationMs);
-  }, [chunkDurationMs]);
-
   const startRealTimeTranscription = useCallback(() => {
     setIsTranscribing(true);
     isActiveRef.current = true;
-    audioChunksRef.current = [];
     
     toast({
       title: "Transcription temps réel",
-      description: "Transcription automatique toutes les 10 secondes"
+      description: "Transcription automatique des segments audio"
     });
-
-    // Start chunked transcription after a short delay
-    setTimeout(startChunkedTranscription, 2000);
-  }, [startChunkedTranscription]);
+  }, []);
 
   const stopRealTimeTranscription = useCallback(() => {
     setIsTranscribing(false);
     isActiveRef.current = false;
     setProgress(0);
-    
-    if (transcriptionIntervalRef.current) {
-      clearInterval(transcriptionIntervalRef.current);
-      transcriptionIntervalRef.current = null;
-    }
 
     toast({
       title: "Transcription arrêtée",
@@ -203,6 +180,7 @@ export const useRealTimeTranscription = ({
     progress,
     currentTranscript,
     isGeneratingSummary,
+    processAudioChunk,
     startRealTimeTranscription,
     stopRealTimeTranscription,
     generateContextualSummary,
