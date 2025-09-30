@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, FileText, FolderOpen } from "lucide-react";
+import { Calendar, Clock, FileText, FolderOpen } from "lucide-react";
+import { CalendarPatientTab } from "./tabs/CalendarPatientTab";
 import { SessionsChildTab } from "./tabs/SessionsChildTab";
 import { BillingChildTab } from "./tabs/BillingChildTab";
 import { FilesChildTab } from "./tabs/FilesChildTab";
@@ -8,12 +9,18 @@ interface ChildTabsProps {
   clientId: string | null;
   activeChildTab: string;
   onChildTabChange: (tab: string) => void;
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
 }
 
-export const ChildTabs = ({ clientId, activeChildTab, onChildTabChange }: ChildTabsProps) => {
+export const ChildTabs = ({ clientId, activeChildTab, onChildTabChange, selectedDate, onDateChange }: ChildTabsProps) => {
   return (
     <Tabs value={activeChildTab} onValueChange={onChildTabChange} className="h-full flex flex-col">
-      <TabsList className="grid w-full grid-cols-3 rounded-none border-b border-border h-12 bg-muted/30">
+      <TabsList className="grid w-full grid-cols-4 rounded-none border-b border-border h-12 bg-muted/30">
+        <TabsTrigger value="calendar" className="flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          Calendrier et Fiche
+        </TabsTrigger>
         <TabsTrigger value="sessions" className="flex items-center gap-2">
           <Clock className="h-4 w-4" />
           Séances
@@ -29,6 +36,14 @@ export const ChildTabs = ({ clientId, activeChildTab, onChildTabChange }: ChildT
       </TabsList>
 
       <div className="flex-1 overflow-hidden">
+        <TabsContent value="calendar" className="h-full mt-0">
+          <CalendarPatientTab 
+            clientId={clientId}
+            selectedDate={selectedDate}
+            onDateChange={onDateChange}
+          />
+        </TabsContent>
+
         <TabsContent value="sessions" className="h-full mt-0">
           <SessionsChildTab clientId={clientId} />
         </TabsContent>
