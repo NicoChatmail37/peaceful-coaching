@@ -165,7 +165,7 @@ export function useAudioRecording(): AudioRecordingHook {
         }
       };
 
-      mediaRecorder.start(10000); // Record in 10-second chunks for better stability
+      mediaRecorder.start(6000); // Record in 6-second chunks for better real-time processing
       mediaRecorderRef.current = mediaRecorder;
 
       // Setup audio analysis

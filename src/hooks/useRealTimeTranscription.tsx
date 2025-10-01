@@ -38,6 +38,7 @@ export const useRealTimeTranscription = ({
 
   const isActiveRef = useRef(false);
   const lastSummaryPositionRef = useRef(0);
+  const transcriptRef = useRef('');
 
   const processAudioChunk = useCallback(async (audioBlob: Blob) => {
     if (!isActiveRef.current) return;
@@ -45,8 +46,22 @@ export const useRealTimeTranscription = ({
     try {
       setProgress(30);
       
-      // Validate chunk size (minimum 10KB for reliable decoding)
-      const minSize = 10000; // 10KB minimum
+      // Validate chunk format first
+      const validFormats = ['audio/wav', 'audio/webm', 'audio/ogg'];
+      const isValidFormat = validFormats.some(fmt => audioBlob.type.includes(fmt));
+      
+      if (!isValidFormat) {
+        console.warn('Invalid audio format:', audioBlob.type);
+        toast({
+          title: "Format audio invalide",
+          description: `Format non supporté: ${audioBlob.type}`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Softer size validation (minimum 5KB for decoding)
+      const minSize = 5000; // 5KB minimum (reduced from 10KB)
       if (audioBlob.size < minSize) {
         console.log('Chunk too small, skipping:', audioBlob.size, 'bytes (min:', minSize, 'bytes)');
         return;
@@ -83,11 +98,12 @@ export const useRealTimeTranscription = ({
         transcriptText = dialogueLines.join('\n\n');
       }
 
-      // Append to current transcript
-      const newTranscript = currentTranscript + 
-        (currentTranscript ? '\n\n' : '') + 
+      // Append to current transcript using ref to avoid callback recreation
+      const newTranscript = transcriptRef.current + 
+        (transcriptRef.current ? '\n\n' : '') + 
         transcriptText;
 
+      transcriptRef.current = newTranscript;
       setCurrentTranscript(newTranscript);
       onTranscriptUpdate(newTranscript);
 
@@ -111,14 +127,16 @@ export const useRealTimeTranscription = ({
       console.error('Chunk size:', audioBlob.size, 'bytes');
       console.error('Chunk type:', audioBlob.type);
       
+      // Don't stop the process on error - just log and continue
       toast({
-        title: "Erreur de transcription",
-        description: `Impossible de transcrire le segment audio: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
-        variant: "destructive"
+        title: "Échec d'un segment",
+        description: "La transcription continue...",
+        variant: "default"
       });
       setProgress(0);
+      // Continue processing - don't throw
     }
-  }, [currentTranscript, onTranscriptUpdate, sessionId, clientId, stereoMode]);
+  }, [onTranscriptUpdate, sessionId, clientId, stereoMode, model]);
 
   const startRealTimeTranscription = useCallback(() => {
     setIsTranscribing(true);
@@ -189,6 +207,7 @@ export const useRealTimeTranscription = ({
   }, [currentTranscript]);
 
   const clearTranscript = useCallback(() => {
+    transcriptRef.current = '';
     setCurrentTranscript('');
     lastSummaryPositionRef.current = 0;
     onTranscriptUpdate('');
