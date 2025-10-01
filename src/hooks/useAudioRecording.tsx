@@ -107,13 +107,14 @@ export function useAudioRecording(): AudioRecordingHook {
         });
       }
 
-      // Audio constraints with stereo optimization
+      // Audio constraints with forced stereo optimization
       const audioConstraints: MediaTrackConstraints = enableStereo ? {
         echoCancellation: false,
         autoGainControl: false,
         noiseSuppression: false,
-        channelCount: 2,
-        sampleRate: 48000
+        channelCount: { ideal: 2, min: 2 }, // Force stereo
+        sampleRate: { ideal: 48000 },
+        deviceId: undefined // Let browser pick the right device
       } : {
         echoCancellation: true,
         noiseSuppression: true,
@@ -124,16 +125,23 @@ export function useAudioRecording(): AudioRecordingHook {
         audio: audioConstraints
       });
 
-      // Check actual channel count
+      // Validate actual channel count
       const track = stream.getAudioTracks()[0];
       const settings = track.getSettings();
       const actualChannels = settings.channelCount || 1;
       const isStereo = enableStereo && actualChannels >= 2;
 
+      console.log('Audio track settings:', {
+        channelCount: actualChannels,
+        sampleRate: settings.sampleRate,
+        deviceId: settings.deviceId,
+        label: track.label
+      });
+
       if (enableStereo && actualChannels < 2) {
         toast({
           title: "Stéréo non disponible",
-          description: "Vérifiez que votre RØDE est configuré en stéréo dans les paramètres système",
+          description: "Un seul canal détecté. Vérifiez les paramètres système de votre RØDE.",
           variant: "default"
         });
       }
@@ -148,7 +156,7 @@ export function useAudioRecording(): AudioRecordingHook {
         mimeType = 'audio/wav';
       }
       
-      console.log('Using MIME type for recording:', mimeType);
+      console.log('Using MIME type for recording:', mimeType, 'Stereo:', isStereo);
       const mediaRecorder = new MediaRecorder(stream, { 
         mimeType,
         audioBitsPerSecond: 128000 // Optimize bitrate for quality/size balance
@@ -156,7 +164,15 @@ export function useAudioRecording(): AudioRecordingHook {
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          console.log('Audio chunk received:', event.data.size, 'bytes, type:', event.data.type);
+          const chunkInfo = {
+            size: event.data.size,
+            type: event.data.type,
+            sizeKB: Math.round(event.data.size / 1024),
+            stereo: isStereo,
+            channels: actualChannels
+          };
+          console.log('📼 Audio chunk received:', chunkInfo);
+          
           chunksRef.current.push(event.data);
           // Call real-time transcription callback if provided
           if (onAudioChunkRef.current && event.data.size > 0) {
@@ -165,7 +181,7 @@ export function useAudioRecording(): AudioRecordingHook {
         }
       };
 
-      mediaRecorder.start(6000); // Record in 6-second chunks for better real-time processing
+      mediaRecorder.start(4000); // Record in 4-second chunks for better real-time processing
       mediaRecorderRef.current = mediaRecorder;
 
       // Setup audio analysis
