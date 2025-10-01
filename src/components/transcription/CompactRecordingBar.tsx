@@ -10,7 +10,8 @@ import {
   Play, 
   Wand2,
   Settings,
-  FileText
+  FileText,
+  CheckCircle
 } from "lucide-react";
 import { useAudioRecording } from "@/hooks/useAudioRecording";
 import { useRealTimeTranscription } from "@/hooks/useRealTimeTranscription";
@@ -47,6 +48,12 @@ export const CompactRecordingBar = ({
     threshold: 0.02,
     level: 0
   });
+  const [modelCachedStatus, setModelCachedStatus] = useState<Record<WhisperModel, boolean>>({
+    'tiny': false,
+    'base': false,
+    'small': false,
+    'medium': false,
+  });
 
   const {
     state,
@@ -77,6 +84,32 @@ export const CompactRecordingBar = ({
     stereoMode: enableStereo,
     model: selectedModel
   });
+
+  // Check model cached status on mount
+  useEffect(() => {
+    const checkModelStatus = async () => {
+      const { checkModelAvailability } = await import('@/lib/whisperService');
+      const status: Record<WhisperModel, boolean> = {
+        'tiny': false,
+        'base': false,
+        'small': false,
+        'medium': false,
+      };
+      
+      for (const model of ['tiny', 'base', 'small', 'medium'] as WhisperModel[]) {
+        try {
+          const available = await checkModelAvailability(model);
+          status[model] = available;
+        } catch {
+          status[model] = false;
+        }
+      }
+      
+      setModelCachedStatus(status);
+    };
+    
+    checkModelStatus();
+  }, []);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -207,17 +240,27 @@ export const CompactRecordingBar = ({
           onValueChange={(value) => setSelectedModel(value as WhisperModel)}
           disabled={disabled || state !== 'idle'}
         >
-          <SelectTrigger className="w-[140px] h-8">
-            <SelectValue />
+          <SelectTrigger className="w-[160px] h-8">
+            <div className="flex items-center gap-1.5">
+              {modelCachedStatus[selectedModel] ? (
+                <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-500 fill-green-600/20 dark:fill-green-500/20" />
+              ) : (
+                <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30" />
+              )}
+              <SelectValue />
+            </div>
           </SelectTrigger>
           <SelectContent>
             {(['tiny', 'base', 'small'] as WhisperModel[]).map((model) => {
               const info = getModelInfo(model);
               return (
                 <SelectItem key={model} value={model}>
-                  <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    {modelCachedStatus[model] && (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-500" />
+                    )}
                     <span className="capitalize">{model}</span>
-                    <span className="text-xs text-muted-foreground ml-2">
+                    <span className="text-xs text-muted-foreground">
                       {info.sizeMB}MB
                     </span>
                   </div>

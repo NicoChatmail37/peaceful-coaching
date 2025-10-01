@@ -405,11 +405,22 @@ export const IALocalSettings = () => {
         <CardContent>
           <div className="space-y-4">
             {modelStatuses.map((model) => (
-              <div key={model.model} className="flex items-center justify-between p-4 border rounded-lg">
+              <div key={model.model} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-medium capitalize">{model.model}</h3>
-                    {model.cached && <CheckCircle className="h-4 w-4 text-success" />}
+                    <div className="flex items-center gap-2">
+                      {model.cached ? (
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-500 fill-green-600/20 dark:fill-green-500/20" />
+                          <Badge variant="secondary" className="bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 border-green-300 dark:border-green-800">
+                            Prêt
+                          </Badge>
+                        </div>
+                      ) : (
+                        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20" />
+                      )}
+                      <h3 className="font-medium capitalize">{model.model}</h3>
+                    </div>
                     {!model.available && <AlertCircle className="h-4 w-4 text-warning" />}
                     {model.requiresBridge && (
                       <Badge variant="secondary" className="text-xs">Bridge</Badge>

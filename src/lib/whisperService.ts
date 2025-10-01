@@ -379,3 +379,47 @@ export function getAvailableModels(bridgeAvailable: boolean): WhisperModel[] {
   
   return bridgeAvailable ? bridgeModels : browserModels;
 }
+
+export async function checkModelAvailability(model: WhisperModel): Promise<boolean> {
+  try {
+    const dbName = 'transformers-cache';
+    const db = await indexedDB.databases();
+    const hasCache = db.some(d => d.name === dbName);
+    
+    if (!hasCache) return false;
+    
+    return new Promise((resolve) => {
+      const request = indexedDB.open(dbName);
+      
+      request.onsuccess = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('models')) {
+          db.close();
+          resolve(false);
+          return;
+        }
+        
+        const transaction = db.transaction(['models'], 'readonly');
+        const store = transaction.objectStore('models');
+        const getAllRequest = store.getAllKeys();
+        
+        getAllRequest.onsuccess = () => {
+          const keys = getAllRequest.result as string[];
+          const modelId = `onnx-community/whisper-${model}`;
+          const isCached = keys.some(key => key.includes(modelId));
+          db.close();
+          resolve(isCached);
+        };
+        
+        getAllRequest.onerror = () => {
+          db.close();
+          resolve(false);
+        };
+      };
+      
+      request.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
