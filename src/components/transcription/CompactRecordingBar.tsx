@@ -15,6 +15,14 @@ import {
 import { useAudioRecording } from "@/hooks/useAudioRecording";
 import { useRealTimeTranscription } from "@/hooks/useRealTimeTranscription";
 import { toast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { getModelInfo, type WhisperModel } from "@/lib/whisperService";
 
 interface CompactRecordingBarProps {
   onTranscriptUpdate: (text: string) => void;
@@ -33,6 +41,7 @@ export const CompactRecordingBar = ({
 }: CompactRecordingBarProps) => {
   const [enableStereo, setEnableStereo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<WhisperModel>('tiny');
 
   const {
     state,
@@ -59,7 +68,8 @@ export const CompactRecordingBar = ({
     sessionId,
     clientId,
     onTranscriptUpdate,
-    stereoMode: enableStereo
+    stereoMode: enableStereo,
+    model: selectedModel
   });
 
   const formatDuration = (seconds: number) => {
@@ -181,6 +191,32 @@ export const CompactRecordingBar = ({
           {state === 'recording' && <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-1" />}
           {formatDuration(duration)}
         </Badge>
+
+        {/* Model selector */}
+        <Select 
+          value={selectedModel} 
+          onValueChange={(value) => setSelectedModel(value as WhisperModel)}
+          disabled={disabled || state !== 'idle'}
+        >
+          <SelectTrigger className="w-[140px] h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(['tiny', 'base', 'small'] as WhisperModel[]).map((model) => {
+              const info = getModelInfo(model);
+              return (
+                <SelectItem key={model} value={model}>
+                  <div className="flex items-center justify-between w-full">
+                    <span className="capitalize">{model}</span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {info.sizeMB}MB
+                    </span>
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
 
         {/* Audio level */}
         {state === 'recording' && (

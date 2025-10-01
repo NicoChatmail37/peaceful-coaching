@@ -142,12 +142,10 @@ export function useAudioRecording(): AudioRecordingHook {
       chunksRef.current = [];
 
       // Setup MediaRecorder with optimal codec for Whisper compatibility
-      // Try audio/wav first for best compatibility, fallback to webm
+      // Prioritize audio/wav for best compatibility, fallback to opus (NOT pcm)
       let mimeType = 'audio/webm;codecs=opus';
       if (MediaRecorder.isTypeSupported('audio/wav')) {
         mimeType = 'audio/wav';
-      } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=pcm')) {
-        mimeType = 'audio/webm;codecs=pcm';
       }
       
       console.log('Using MIME type for recording:', mimeType);

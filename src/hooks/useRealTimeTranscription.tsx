@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { transcribeAudio } from "@/lib/whisperService";
+import { transcribeAudio, type WhisperModel } from "@/lib/whisperService";
 import { generateSummary } from "@/lib/llmService";
 import { storeAudioBlob, storeTranscriptResult } from "@/lib/transcriptionStorage";
 import { toast } from "@/hooks/use-toast";
@@ -9,6 +9,7 @@ interface UseRealTimeTranscriptionProps {
   clientId: string;
   onTranscriptUpdate: (text: string) => void;
   stereoMode?: boolean;
+  model?: WhisperModel;
 }
 
 interface UseRealTimeTranscriptionResult {
@@ -27,7 +28,8 @@ export const useRealTimeTranscription = ({
   sessionId,
   clientId,
   onTranscriptUpdate,
-  stereoMode = false
+  stereoMode = false,
+  model = 'tiny'
 }: UseRealTimeTranscriptionProps): UseRealTimeTranscriptionResult => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -59,7 +61,7 @@ export const useRealTimeTranscription = ({
 
       // Transcribe the chunk
       const result = await transcribeAudio(audioBlob, {
-        model: 'tiny', // Use fastest model for real-time
+        model: model,
         language: 'fr', // Multilingual model supports French
         mode: 'auto',
         onProgress: (p) => setProgress(30 + (p * 0.4))
@@ -95,7 +97,7 @@ export const useRealTimeTranscription = ({
       await storeAudioBlob(audioBlob, sessionId, clientId);
       await storeTranscriptResult({
         audio_id: Date.now().toString(), // Temporary ID
-        model: 'tiny',
+        model: model,
         lang: 'fr', // Multilingual model supports French
         text: transcriptText,
         segments: result.segments,
