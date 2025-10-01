@@ -12,6 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { usePatients } from "@/hooks/usePatients";
 import { useAppointments, Appointment } from "@/hooks/useAppointments";
 import { format } from "date-fns";
@@ -42,9 +52,10 @@ export const AppointmentDialog = ({
     location: ''
   });
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   const { patients } = usePatients();
-  const { createAppointment, updateAppointment } = useAppointments();
+  const { createAppointment, updateAppointment, deleteAppointment } = useAppointments();
 
   useEffect(() => {
     if (appointment) {
@@ -100,6 +111,22 @@ export const AppointmentDialog = ({
       if (success) {
         onSuccess();
         onOpenChange(false);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!appointment) return;
+    
+    setLoading(true);
+    try {
+      const success = await deleteAppointment(appointment.id);
+      if (success) {
+        onSuccess();
+        onOpenChange(false);
+        setShowDeleteConfirm(false);
       }
     } finally {
       setLoading(false);
@@ -200,21 +227,57 @@ export const AppointmentDialog = ({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Annuler
-            </Button>
-            <Button type="submit" disabled={loading || !formData.client_id || !formData.date}>
-              {loading ? 'Sauvegarde...' : (appointment ? 'Modifier' : 'Créer')}
-            </Button>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <div className="flex-1">
+              {appointment && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={loading}
+                  className="w-full sm:w-auto"
+                >
+                  Annuler le rendez-vous
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={loading}
+              >
+                Annuler
+              </Button>
+              <Button type="submit" disabled={loading || !formData.client_id || !formData.date}>
+                {loading ? 'Sauvegarde...' : (appointment ? 'Modifier' : 'Créer')}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler le rendez-vous</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir annuler ce rendez-vous ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Non, garder</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading ? 'Suppression...' : 'Oui, annuler'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };
