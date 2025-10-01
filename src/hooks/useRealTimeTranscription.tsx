@@ -22,6 +22,7 @@ interface UseRealTimeTranscriptionResult {
   stopRealTimeTranscription: () => void;
   generateContextualSummary: () => Promise<string | null>;
   clearTranscript: () => void;
+  flushPendingChunk: () => Promise<void>;
 }
 
 export const useRealTimeTranscription = ({
@@ -46,7 +47,7 @@ export const useRealTimeTranscription = ({
   const vadBufferRef = useRef<Blob[]>([]);
   const lastActivityTimeRef = useRef<number>(Date.now());
   const audioLevelsRef = useRef<number[]>([]);
-  const vadThresholdRef = useRef<number>(0.02); // Adaptive threshold
+  const vadThresholdRef = useRef<number>(0.005); // Lower initial threshold
 
   const processOne = useCallback(async (audioBlob: Blob) => {
     try {
@@ -56,13 +57,6 @@ export const useRealTimeTranscription = ({
       const minSize = 1000; // 1KB minimum
       if (audioBlob.size < minSize) {
         console.log('⚠️ Chunk too small, skipping:', audioBlob.size, 'bytes');
-        return;
-      }
-
-      // Validate audio content (now very permissive, VAD handles it)
-      const hasValidContent = await validateAudioContent(audioBlob);
-      if (!hasValidContent) {
-        console.log('⚠️ Chunk too small, skipping');
         return;
       }
 
@@ -84,24 +78,57 @@ export const useRealTimeTranscription = ({
 
       setProgress(80);
 
-      let transcriptText = result.text.trim();
+      let transcriptText = result.text?.trim() ?? "";
       if (!transcriptText) { 
         setProgress(0); 
         return; 
       }
 
-      // Format as dialogue if stereo mode with channel-based speaker detection
-      if (stereoMode && result.segments) {
-        const dialogueLines = result.segments.map((segment: any, index: number) => {
-          const segmentNumber = Math.floor(segment.start / 5); // 5-second segments
+      // --- Anti-hallucination guard: detect excessive trigram repetitions ---
+      const repeatedTrigram = (() => {
+        const words = transcriptText.split(/\s+/);
+        let streak = 1;
+        for (let i = 3; i < words.length; i++) {
+          const a = words.slice(i-3, i).join(" ").toLowerCase();
+          const b = words.slice(i-2, i+1).join(" ").toLowerCase();
+          if (a === b) { 
+            streak++; 
+            if (streak > 10) return true; 
+          } else { 
+            streak = 1; 
+          }
+        }
+        return false;
+      })();
+      
+      if (repeatedTrigram) {
+        console.warn("🧹 Segment ignoré (répétitions détectées - hallucination du modèle)");
+        toast({
+          title: "Segment ignoré",
+          description: "Répétitions détectées. Essayez le modèle 'base' pour plus de précision.",
+          variant: "default"
+        });
+        setProgress(0);
+        return;
+      }
+
+      // --- Robust stereo formatting with seg.t0 ---
+      if (stereoMode && Array.isArray(result.segments) && result.segments.length) {
+        const dialogueLines = result.segments.map((seg: any, i: number) => {
+          const start = Number.isFinite(seg?.t0) ? seg.t0 : 0;
+          const segmentNumber = Math.floor(start / 5);
           const isTherapist = segmentNumber % 2 === 0;
           const speaker = isTherapist ? '**Thérapeute:**' : '**Client:**';
           
-          console.log(`🎭 Segment ${index}: ${speaker} (${segment.start.toFixed(1)}s)`);
+          try {
+            console.log(`🎭 Segment ${i}: ${speaker} (${start.toFixed(1)}s)`);
+          } catch {
+            console.log(`🎭 Segment ${i}: ${speaker}`);
+          }
           
-          return `${speaker} ${segment.text}`;
+          return `${speaker} ${seg.text ?? ""}`.trim();
         });
-        transcriptText = dialogueLines.join('\n\n');
+        transcriptText = dialogueLines.join('\n\n').trim();
       }
 
       // Append to current transcript
@@ -158,9 +185,9 @@ export const useRealTimeTranscription = ({
       audioLevelsRef.current.shift();
     }
     
-    // Update adaptive threshold (average of recent levels)
+    // Update adaptive threshold with lower minimum (0.005 instead of 0.01)
     const avgLevel = audioLevelsRef.current.reduce((a, b) => a + b, 0) / audioLevelsRef.current.length;
-    vadThresholdRef.current = Math.max(0.01, avgLevel * 0.3); // 30% of average
+    vadThresholdRef.current = Math.max(0.003, avgLevel * 0.3); // Lower threshold, 30% of average
     
     console.log('🎤 Audio level:', {
       current: audioLevel.toFixed(3),
@@ -223,12 +250,6 @@ export const useRealTimeTranscription = ({
     }
   };
 
-  // Helper function to validate audio content (detect silence)
-  const validateAudioContent = async (blob: Blob): Promise<boolean> => {
-    // Now using VAD system, so we just check minimum size
-    const minSize = 1000; // 1KB minimum (very permissive)
-    return blob.size >= minSize;
-  };
 
   const startRealTimeTranscription = useCallback(() => {
     setIsTranscribing(true);
@@ -305,6 +326,25 @@ export const useRealTimeTranscription = ({
     onTranscriptUpdate('');
   }, [onTranscriptUpdate]);
 
+  const flushPendingChunk = useCallback(async () => {
+    // Flush any remaining VAD buffer
+    if (vadBufferRef.current.length > 0) {
+      console.log('🔄 Flushing pending VAD buffer...', vadBufferRef.current.length, 'chunks');
+      const mergedBlob = new Blob(vadBufferRef.current, { type: vadBufferRef.current[0].type });
+      vadBufferRef.current = [];
+      queueRef.current.push(mergedBlob);
+    }
+
+    // Wait for queue to empty (max 5s)
+    const maxWaitMs = 5000;
+    const start = Date.now();
+    while ((queueRef.current.length > 0 || processingRef.current) && Date.now() - start < maxWaitMs) {
+      await new Promise(res => setTimeout(res, 50));
+    }
+    
+    console.log('✅ Flush complete. Queue empty:', queueRef.current.length === 0);
+  }, []);
+
   return {
     isTranscribing,
     progress,
@@ -314,6 +354,7 @@ export const useRealTimeTranscription = ({
     startRealTimeTranscription,
     stopRealTimeTranscription,
     generateContextualSummary,
-    clearTranscript
+    clearTranscript,
+    flushPendingChunk
   };
 };

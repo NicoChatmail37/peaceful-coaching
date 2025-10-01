@@ -149,8 +149,75 @@ export function useAudioRecording(): AudioRecordingHook {
       streamRef.current = stream;
       chunksRef.current = [];
 
-      // Setup MediaRecorder with optimal codec for Whisper compatibility
-      // NEVER use audio/wav with MediaRecorder - it doesn't support timesliced recording
+      // Setup WebAudio processing chain FIRST (before MediaRecorder)
+      const audioContext = new AudioContext({ sampleRate: 48000 });
+      const source = audioContext.createMediaStreamSource(stream);
+      
+      // === WebAudio processing chain ===
+      // 1. Pre-gain: boost weak signals
+      const preGain = audioContext.createGain();
+      preGain.gain.value = 2.5; // Boost by 2.5x
+      
+      // 2. Compressor: prevent clipping
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -24; // dBFS
+      compressor.knee.value = 6;
+      compressor.ratio.value = 3;
+      compressor.attack.value = 0.01;
+      compressor.release.value = 0.2;
+      
+      // 3. Post-gain (makeup gain)
+      const postGain = audioContext.createGain();
+      postGain.gain.value = 1.2;
+      
+      // Connect chain
+      source.connect(preGain);
+      preGain.connect(compressor);
+      compressor.connect(postGain);
+      
+      console.log('🎛️ Audio processing chain:', {
+        preGain: preGain.gain.value,
+        compressor: {
+          threshold: compressor.threshold.value,
+          ratio: compressor.ratio.value,
+          attack: compressor.attack.value,
+          release: compressor.release.value
+        },
+        postGain: postGain.gain.value
+      });
+      
+      // === Setup destination for recording the PROCESSED stream ===
+      const destination = audioContext.createMediaStreamDestination();
+      
+      if (isStereo) {
+        // Stereo analysis + recording setup
+        const splitter = audioContext.createChannelSplitter(2);
+        const leftAnalyzer = audioContext.createAnalyser();
+        const rightAnalyzer = audioContext.createAnalyser();
+        
+        leftAnalyzer.fftSize = 256;
+        rightAnalyzer.fftSize = 256;
+        
+        postGain.connect(splitter);
+        postGain.connect(destination); // Record processed stream
+        splitter.connect(leftAnalyzer, 0);
+        splitter.connect(rightAnalyzer, 1);
+        
+        splitterRef.current = splitter;
+        leftAnalyzerRef.current = leftAnalyzer;
+        rightAnalyzerRef.current = rightAnalyzer;
+      } else {
+        // Mono analysis + recording setup
+        const analyzer = audioContext.createAnalyser();
+        analyzer.fftSize = 256;
+        postGain.connect(analyzer);
+        postGain.connect(destination); // Record processed stream
+        analyzerRef.current = analyzer;
+      }
+
+      audioContextRef.current = audioContext;
+
+      // === Setup MediaRecorder on the PROCESSED stream ===
       const pickMime = () => {
         const prefs = [
           "audio/webm;codecs=opus",
@@ -165,9 +232,10 @@ export function useAudioRecording(): AudioRecordingHook {
       };
 
       const mimeType = pickMime();
-      console.log('Using MIME type for recording:', mimeType || '(browser default)', 'Stereo:', isStereo);
+      console.log('📼 Using MIME type for recording:', mimeType || '(browser default)', 'Stereo:', isStereo);
 
-      const mediaRecorder = new MediaRecorder(stream, {
+      // Record the PROCESSED stream, not the original
+      const mediaRecorder = new MediaRecorder(destination.stream, {
         mimeType: mimeType || undefined,
         audioBitsPerSecond: 128000,
       });
@@ -176,14 +244,10 @@ export function useAudioRecording(): AudioRecordingHook {
         console.error('MediaRecorder error:', e);
         toast({
           title: "Erreur d'enregistrement",
-          description: "Le flux a rencontré une erreur. Relance en cours…",
+          description: "Le flux a rencontré une erreur.",
           variant: "destructive"
         });
       };
-
-      mediaRecorder.onstart = () => console.log('Recorder started');
-      mediaRecorder.onpause = () => console.log('Recorder paused');
-      mediaRecorder.onresume = () => console.log('Recorder resumed');
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -206,7 +270,7 @@ export function useAudioRecording(): AudioRecordingHook {
 
       mediaRecorder.start(3000); // Record in 3-second chunks for better real-time processing
       
-      // Watchdog: force data emission periodically even if timeslice drifts
+      // Watchdog: force data emission periodically
       const requestDataTimer = setInterval(() => {
         try { mediaRecorder.requestData(); } catch {}
       }, 5000);
@@ -215,58 +279,6 @@ export function useAudioRecording(): AudioRecordingHook {
       (mediaRecorder as any)._requestDataTimer = requestDataTimer;
       
       mediaRecorderRef.current = mediaRecorder;
-
-      // Setup audio analysis with GAIN BOOST
-      const audioContext = new AudioContext({ sampleRate: 48000 });
-      const source = audioContext.createMediaStreamSource(stream);
-      
-      // Add GainNode to boost weak signals (RØDE mic fix)
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = 2.5; // Boost by 2.5x (adjustable)
-      source.connect(gainNode);
-      
-      // Add compressor to normalize volume spikes
-      const compressor = audioContext.createDynamicsCompressor();
-      compressor.threshold.value = -30;
-      compressor.knee.value = 20;
-      compressor.ratio.value = 8;
-      compressor.attack.value = 0.003;
-      compressor.release.value = 0.25;
-      gainNode.connect(compressor);
-      
-      console.log('Audio processing chain:', {
-        gain: gainNode.gain.value,
-        compressor: {
-          threshold: compressor.threshold.value,
-          ratio: compressor.ratio.value
-        }
-      });
-      
-      if (isStereo) {
-        // Stereo analysis setup
-        const splitter = audioContext.createChannelSplitter(2);
-        const leftAnalyzer = audioContext.createAnalyser();
-        const rightAnalyzer = audioContext.createAnalyser();
-        
-        leftAnalyzer.fftSize = 256;
-        rightAnalyzer.fftSize = 256;
-        
-        compressor.connect(splitter);
-        splitter.connect(leftAnalyzer, 0);
-        splitter.connect(rightAnalyzer, 1);
-        
-        splitterRef.current = splitter;
-        leftAnalyzerRef.current = leftAnalyzer;
-        rightAnalyzerRef.current = rightAnalyzer;
-      } else {
-        // Mono analysis setup
-        const analyzer = audioContext.createAnalyser();
-        analyzer.fftSize = 256;
-        compressor.connect(analyzer);
-        analyzerRef.current = analyzer;
-      }
-
-      audioContextRef.current = audioContext;
 
       // Update stereo info
       setStereoInfo({

@@ -68,7 +68,8 @@ export const CompactRecordingBar = ({
     stopRealTimeTranscription,
     generateContextualSummary,
     isGeneratingSummary,
-    currentTranscript
+    currentTranscript,
+    flushPendingChunk
   } = useRealTimeTranscription({
     sessionId,
     clientId,
@@ -91,6 +92,9 @@ export const CompactRecordingBar = ({
   const handleStop = async () => {
     const audioBlob = await stopRecording();
     stopRealTimeTranscription();
+    
+    // Flush any pending VAD buffer before finalizing
+    await flushPendingChunk();
     
     if (audioBlob) {
       toast({
