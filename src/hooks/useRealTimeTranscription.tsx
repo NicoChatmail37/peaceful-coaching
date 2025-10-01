@@ -52,7 +52,7 @@ export const useRealTimeTranscription = ({
       // Transcribe the chunk
       const result = await transcribeAudio(audioBlob, {
         model: 'tiny', // Use fastest model for real-time
-        language: 'en', // Changed from 'fr' to match tiny.en model
+        language: 'fr', // Multilingual model supports French
         mode: 'auto',
         onProgress: (p) => setProgress(30 + (p * 0.4))
       });
@@ -88,7 +88,7 @@ export const useRealTimeTranscription = ({
       await storeTranscriptResult({
         audio_id: Date.now().toString(), // Temporary ID
         model: 'tiny',
-        lang: 'fr',
+        lang: 'fr', // Multilingual model supports French
         text: transcriptText,
         segments: result.segments,
         srt: result.srt

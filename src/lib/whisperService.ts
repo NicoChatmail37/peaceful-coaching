@@ -45,7 +45,8 @@ export async function initWhisper(model: WhisperModel = 'tiny', onProgress?: (pr
     return; // Already initialized with the same model
   }
 
-  const modelName = `onnx-community/whisper-${model}.en`;
+  // Use multilingual model (no .en suffix) to support French, English, and auto-detection
+  const modelName = `onnx-community/whisper-${model}`;
   
   try {
     whisperPipeline = await pipeline(
@@ -189,12 +190,19 @@ export async function transcribeAudio(
   const audioUrl = URL.createObjectURL(audioBlob);
   
   try {
-    const result = await whisperPipeline(audioUrl, {
-      language,
+    // Build options - omit language if undefined for auto-detection
+    const pipelineOptions: any = {
       return_timestamps: true,
       chunk_length_s: 30,
       stride_length_s: 5,
-    });
+    };
+    
+    // Only include language if specified (allows auto-detection)
+    if (language) {
+      pipelineOptions.language = language;
+    }
+    
+    const result = await whisperPipeline(audioUrl, pipelineOptions);
 
     URL.revokeObjectURL(audioUrl);
 
