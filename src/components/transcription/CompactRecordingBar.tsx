@@ -42,6 +42,11 @@ export const CompactRecordingBar = ({
   const [enableStereo, setEnableStereo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedModel, setSelectedModel] = useState<WhisperModel>('tiny');
+  const [vadActivity, setVadActivity] = useState<{ active: boolean; threshold: number; level: number }>({
+    active: false,
+    threshold: 0.02,
+    level: 0
+  });
 
   const {
     state,
@@ -218,11 +223,27 @@ export const CompactRecordingBar = ({
           </SelectContent>
         </Select>
 
-        {/* Audio level */}
+        {/* Audio level with VAD indicator */}
         {state === 'recording' && (
           <div className="flex items-center gap-2">
-            <div className="w-16 h-2">
-              <Progress value={audioLevel * 100} className="h-2" />
+            <div className="flex flex-col gap-0.5">
+              <div className="w-20 h-2 bg-muted rounded-full overflow-hidden relative">
+                <div 
+                  className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-75"
+                  style={{ width: `${audioLevel * 100}%` }}
+                />
+                {/* VAD threshold indicator */}
+                <div 
+                  className="absolute top-0 h-full w-0.5 bg-yellow-400/60"
+                  style={{ left: `${vadActivity.threshold * 100}%` }}
+                />
+              </div>
+              <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <span>Gain: 2.5x</span>
+                {vadActivity.active && (
+                  <span className="text-green-500 animate-pulse">● VOIX</span>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -289,20 +310,33 @@ export const CompactRecordingBar = ({
 
       {/* Stereo settings (collapsible) */}
       {showSettings && (
-        <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
-          <div className="flex items-center gap-2">
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">Mode stéréo</span>
-              <span className="text-xs text-muted-foreground">
-                Dialogue thérapeutique séparé par canal
-              </span>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">Mode stéréo</span>
+                <span className="text-xs text-muted-foreground">
+                  Dialogue thérapeutique séparé par canal
+                </span>
+              </div>
+            </div>
+            <Switch
+              checked={enableStereo}
+              onCheckedChange={setEnableStereo}
+              disabled={disabled || state !== 'idle'}
+            />
+          </div>
+          
+          {/* VAD info */}
+          <div className="p-2 bg-muted/20 rounded text-xs space-y-1">
+            <div className="font-medium">Voice Activity Detection (VAD)</div>
+            <div className="text-muted-foreground">
+              • Détection automatique des pauses (2.5s)<br/>
+              • Gain audio: 2.5x (microphones professionnels)<br/>
+              • Compression dynamique pour stabilisation<br/>
+              • Seuil adaptatif selon l'environnement
             </div>
           </div>
-          <Switch
-            checked={enableStereo}
-            onCheckedChange={setEnableStereo}
-            disabled={disabled || state !== 'idle'}
-          />
         </div>
       )}
     </div>

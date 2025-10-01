@@ -41,36 +41,28 @@ export const useRealTimeTranscription = ({
   const transcriptRef = useRef('');
   const queueRef = useRef<Blob[]>([]);
   const processingRef = useRef(false);
+  
+  // VAD (Voice Activity Detection) state
+  const vadBufferRef = useRef<Blob[]>([]);
+  const lastActivityTimeRef = useRef<number>(Date.now());
+  const audioLevelsRef = useRef<number[]>([]);
+  const vadThresholdRef = useRef<number>(0.02); // Adaptive threshold
 
   const processOne = useCallback(async (audioBlob: Blob) => {
     try {
       setProgress(30);
       
-      // Validate chunk format first
-      const validFormats = ['audio/wav', 'audio/webm', 'audio/ogg'];
-      const isValidFormat = validFormats.some(fmt => audioBlob.type.includes(fmt));
-      
-      if (!isValidFormat) {
-        console.warn('❌ Invalid audio format:', audioBlob.type);
-        toast({
-          title: "Format audio invalide",
-          description: `Format non supporté: ${audioBlob.type}`,
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Softer size validation (minimum 3KB for decoding)
-      const minSize = 3000; // 3KB minimum (reduced for 3s chunks)
+      // Very permissive size validation (VAD handles quality)
+      const minSize = 1000; // 1KB minimum
       if (audioBlob.size < minSize) {
-        console.log('⚠️ Chunk too small, skipping:', audioBlob.size, 'bytes (min:', minSize, 'bytes)');
+        console.log('⚠️ Chunk too small, skipping:', audioBlob.size, 'bytes');
         return;
       }
 
-      // Validate audio content by checking for silence
+      // Validate audio content (now very permissive, VAD handles it)
       const hasValidContent = await validateAudioContent(audioBlob);
       if (!hasValidContent) {
-        console.log('⚠️ Chunk contains only silence, skipping');
+        console.log('⚠️ Chunk too small, skipping');
         return;
       }
 
@@ -156,26 +148,86 @@ export const useRealTimeTranscription = ({
 
   const processAudioChunk = useCallback(async (blob: Blob) => {
     if (!isActiveRef.current) return;
-    queueRef.current.push(blob);
-    pump();
+    
+    // Analyze audio level for VAD
+    const audioLevel = await analyzeAudioLevel(blob);
+    audioLevelsRef.current.push(audioLevel);
+    
+    // Keep only last 20 readings for adaptive threshold
+    if (audioLevelsRef.current.length > 20) {
+      audioLevelsRef.current.shift();
+    }
+    
+    // Update adaptive threshold (average of recent levels)
+    const avgLevel = audioLevelsRef.current.reduce((a, b) => a + b, 0) / audioLevelsRef.current.length;
+    vadThresholdRef.current = Math.max(0.01, avgLevel * 0.3); // 30% of average
+    
+    console.log('🎤 Audio level:', {
+      current: audioLevel.toFixed(3),
+      threshold: vadThresholdRef.current.toFixed(3),
+      avgLevel: avgLevel.toFixed(3)
+    });
+    
+    // Voice Activity Detection
+    const hasActivity = audioLevel > vadThresholdRef.current;
+    
+    if (hasActivity) {
+      lastActivityTimeRef.current = Date.now();
+      vadBufferRef.current.push(blob);
+      console.log('✅ Activity detected, buffering... (buffer size:', vadBufferRef.current.length, ')');
+    } else {
+      const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
+      
+      // If we have buffered audio and 2.5s of silence, process the buffer
+      if (vadBufferRef.current.length > 0 && timeSinceActivity > 2500) {
+        console.log('🔇 Silence detected after activity, processing buffer...', {
+          bufferSize: vadBufferRef.current.length,
+          silenceDuration: timeSinceActivity
+        });
+        
+        // Merge buffered chunks into one
+        const mergedBlob = new Blob(vadBufferRef.current, { type: vadBufferRef.current[0].type });
+        vadBufferRef.current = [];
+        
+        queueRef.current.push(mergedBlob);
+        pump();
+      }
+    }
   }, [pump]);
+
+  // Analyze audio level from blob for VAD
+  const analyzeAudioLevel = async (blob: Blob): Promise<number> => {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      try {
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // Calculate RMS (root mean square) for audio level
+        let sum = 0;
+        const channelData = audioBuffer.getChannelData(0);
+        for (let i = 0; i < channelData.length; i++) {
+          sum += channelData[i] * channelData[i];
+        }
+        const rms = Math.sqrt(sum / channelData.length);
+        
+        await audioContext.close();
+        return rms;
+      } catch {
+        await audioContext.close();
+        return 0;
+      }
+    } catch {
+      return 0;
+    }
+  };
 
   // Helper function to validate audio content (detect silence)
   const validateAudioContent = async (blob: Blob): Promise<boolean> => {
-    try {
-      // Quick heuristic: check blob size density
-      // Silent audio compresses very well, so low size for duration is suspicious
-      const sizePerSecond = blob.size / 4; // 4 seconds chunks
-      const minSizePerSecond = 500; // Minimum 500 bytes per second
-      
-      if (sizePerSecond < minSizePerSecond) {
-        return false; // Likely silence
-      }
-      
-      return true;
-    } catch {
-      return true; // If validation fails, process anyway
-    }
+    // Now using VAD system, so we just check minimum size
+    const minSize = 1000; // 1KB minimum (very permissive)
+    return blob.size >= minSize;
   };
 
   const startRealTimeTranscription = useCallback(() => {

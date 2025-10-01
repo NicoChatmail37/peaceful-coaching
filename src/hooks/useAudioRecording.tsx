@@ -216,9 +216,31 @@ export function useAudioRecording(): AudioRecordingHook {
       
       mediaRecorderRef.current = mediaRecorder;
 
-      // Setup audio analysis
+      // Setup audio analysis with GAIN BOOST
       const audioContext = new AudioContext({ sampleRate: 48000 });
       const source = audioContext.createMediaStreamSource(stream);
+      
+      // Add GainNode to boost weak signals (RØDE mic fix)
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 2.5; // Boost by 2.5x (adjustable)
+      source.connect(gainNode);
+      
+      // Add compressor to normalize volume spikes
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -30;
+      compressor.knee.value = 20;
+      compressor.ratio.value = 8;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+      gainNode.connect(compressor);
+      
+      console.log('Audio processing chain:', {
+        gain: gainNode.gain.value,
+        compressor: {
+          threshold: compressor.threshold.value,
+          ratio: compressor.ratio.value
+        }
+      });
       
       if (isStereo) {
         // Stereo analysis setup
@@ -229,7 +251,7 @@ export function useAudioRecording(): AudioRecordingHook {
         leftAnalyzer.fftSize = 256;
         rightAnalyzer.fftSize = 256;
         
-        source.connect(splitter);
+        compressor.connect(splitter);
         splitter.connect(leftAnalyzer, 0);
         splitter.connect(rightAnalyzer, 1);
         
@@ -240,7 +262,7 @@ export function useAudioRecording(): AudioRecordingHook {
         // Mono analysis setup
         const analyzer = audioContext.createAnalyser();
         analyzer.fftSize = 256;
-        source.connect(analyzer);
+        compressor.connect(analyzer);
         analyzerRef.current = analyzer;
       }
 

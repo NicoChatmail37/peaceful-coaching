@@ -187,12 +187,19 @@ export async function transcribeAudio(
     await initWhisper(model, onProgress);
   }
 
-  const audioUrl = URL.createObjectURL(audioBlob);
+  // Convert audio to WAV format if needed (Whisper requires WAV/PCM)
+  let processedBlob = audioBlob;
+  if (audioBlob.type.includes('webm') || audioBlob.type.includes('ogg') || audioBlob.type.includes('opus')) {
+    console.log('Converting audio from', audioBlob.type, 'to WAV for Whisper...');
+    processedBlob = await convertToWav(audioBlob);
+  }
+
+  const audioUrl = URL.createObjectURL(processedBlob);
   
   try {
     console.log('Transcribing audio:', {
-      size: audioBlob.size,
-      type: audioBlob.type,
+      size: processedBlob.size,
+      type: processedBlob.type,
       model,
       language
     });
@@ -235,18 +242,97 @@ export async function transcribeAudio(
     URL.revokeObjectURL(audioUrl);
     console.error('Transcription error:', error);
     console.error('Audio blob details:', {
-      size: audioBlob.size,
-      type: audioBlob.type,
-      sizeKB: Math.round(audioBlob.size / 1024)
+      size: processedBlob.size,
+      type: processedBlob.type,
+      sizeKB: Math.round(processedBlob.size / 1024)
     });
     
     // Provide more specific error messages
     if (error instanceof Error) {
       if (error.message.includes('decode')) {
-        throw new Error(`Format audio incompatible (${audioBlob.type}). Taille: ${Math.round(audioBlob.size / 1024)}KB`);
+        throw new Error(`Erreur de décodage audio. Essayez un autre format.`);
       }
     }
     throw error;
+  }
+}
+
+/**
+ * Convert audio blob to WAV format using Web Audio API
+ * This is necessary because Whisper.js requires PCM WAV format
+ */
+async function convertToWav(audioBlob: Blob): Promise<Blob> {
+  const arrayBuffer = await audioBlob.arrayBuffer();
+  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  
+  try {
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    // Convert to WAV with proper PCM encoding
+    const wavBlob = audioBufferToWav(audioBuffer);
+    
+    console.log('Audio converted:', {
+      originalSize: audioBlob.size,
+      convertedSize: wavBlob.size,
+      channels: audioBuffer.numberOfChannels,
+      sampleRate: audioBuffer.sampleRate,
+      duration: audioBuffer.duration
+    });
+    
+    await audioContext.close();
+    return wavBlob;
+  } catch (error) {
+    await audioContext.close();
+    throw new Error(`Impossible de décoder l'audio: ${error}`);
+  }
+}
+
+/**
+ * Convert AudioBuffer to WAV blob
+ */
+function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
+  const numberOfChannels = audioBuffer.numberOfChannels;
+  const sampleRate = audioBuffer.sampleRate;
+  const length = audioBuffer.length * numberOfChannels * 2;
+  const buffer = new ArrayBuffer(44 + length);
+  const view = new DataView(buffer);
+  
+  // WAV header
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + length, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numberOfChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+  view.setUint16(32, numberOfChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, length, true);
+  
+  // Write interleaved audio data
+  const channels = [];
+  for (let i = 0; i < numberOfChannels; i++) {
+    channels.push(audioBuffer.getChannelData(i));
+  }
+  
+  let offset = 44;
+  for (let i = 0; i < audioBuffer.length; i++) {
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const sample = Math.max(-1, Math.min(1, channels[channel][i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+  
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function writeString(view: DataView, offset: number, string: string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
   }
 }
 
