@@ -122,6 +122,17 @@ export const IALocalSettings = () => {
         ));
       });
       
+      // Strict re-check via IndexedDB after download
+      const { checkModelAvailability } = await import('@/lib/whisperService');
+      const isActuallyCached = await checkModelAvailability(model);
+      
+      // If not actually cached but preference says ready, fix the mismatch
+      if (!isActuallyCached) {
+        const db = await getTranscriptionDB();
+        await db.delete('prefs', `model_${model}_ready`);
+        console.warn('⚠️ Model marked ready but not in cache - preference cleared');
+      }
+      
       // Refresh statuses after download
       await loadEnvironmentAndPreferences();
       
@@ -129,8 +140,11 @@ export const IALocalSettings = () => {
       window.dispatchEvent(new CustomEvent('modelCacheUpdated', { detail: { model } }));
       
       toast({
-        title: "Téléchargement terminé ✅",
-        description: `Le modèle ${model} est maintenant disponible pour la transcription`,
+        title: isActuallyCached ? "Téléchargement terminé ✅" : "Vérification requise",
+        description: isActuallyCached 
+          ? `Le modèle ${model} est maintenant disponible pour la transcription`
+          : `Le téléchargement s'est terminé mais le modèle n'est pas détecté dans le cache. Réessayez.`,
+        variant: isActuallyCached ? "default" : "destructive"
       });
       
     } catch (error) {
@@ -159,20 +173,14 @@ export const IALocalSettings = () => {
 
   const handleDeleteModel = async (model: WhisperModel) => {
     try {
-      // Mark model as not ready
-      const db = await getTranscriptionDB();
-      await db.delete('prefs', `model_${model}_ready`);
-      
-      // Clear browser cache for this model (if possible)
-      try {
-        const cacheNames = await caches.keys();
-        const modelCaches = cacheNames.filter(name => name.includes(`whisper-${model}`));
-        await Promise.all(modelCaches.map(name => caches.delete(name)));
-      } catch (error) {
-        console.warn('Failed to clear cache:', error);
-      }
+      // Use deleteModelCache to properly remove from IndexedDB
+      const { deleteModelCache } = await import('@/lib/whisperService');
+      await deleteModelCache(model);
       
       await loadEnvironmentAndPreferences();
+      
+      // Dispatch event to sync with CompactRecordingBar
+      window.dispatchEvent(new CustomEvent('modelCacheUpdated', { detail: { model } }));
       
       toast({
         title: "Modèle supprimé",

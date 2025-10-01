@@ -138,6 +138,21 @@ export const CompactRecordingBar = ({
   };
 
   const handleStart = async () => {
+    // Pre-load the Whisper pipeline before recording starts
+    try {
+      const { initWhisper } = await import('@/lib/whisperService');
+      await initWhisper(selectedModel);
+      console.log('✅ Pipeline pre-loaded:', selectedModel);
+    } catch (error) {
+      console.error('Failed to pre-load pipeline:', error);
+      toast({
+        title: "Erreur de chargement du modèle",
+        description: `Impossible de charger le modèle ${selectedModel}. Vérifiez qu'il est téléchargé.`,
+        variant: "destructive"
+      });
+      return; // Don't start recording if model can't load
+    }
+    
     startRealTimeTranscription();
     await startRecording(enableStereo, processAudioChunk);
   };

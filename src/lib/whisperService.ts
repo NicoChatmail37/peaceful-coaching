@@ -386,7 +386,17 @@ export async function checkModelAvailability(model: WhisperModel): Promise<boole
     const db = await indexedDB.databases();
     const hasCache = db.some(d => d.name === dbName);
     
-    if (!hasCache) return false;
+    if (!hasCache) {
+      // Fallback: check preference if IndexedDB not available
+      try {
+        const { getTranscriptionDB } = await import('@/lib/transcriptionStorage');
+        const prefsDB = await getTranscriptionDB();
+        const pref = await prefsDB.get('prefs', `model_${model}_ready`);
+        return pref?.value === true;
+      } catch {
+        return false;
+      }
+    }
     
     return new Promise((resolve) => {
       const request = indexedDB.open(dbName);
@@ -405,8 +415,17 @@ export async function checkModelAvailability(model: WhisperModel): Promise<boole
         
         getAllRequest.onsuccess = () => {
           const keys = getAllRequest.result as string[];
-          const modelId = `onnx-community/whisper-${model}`;
-          const isCached = keys.some(key => key.includes(modelId));
+          // Check for both .en and non-.en variants
+          const modelIdMulti = `onnx-community/whisper-${model}`;
+          const modelIdEn = `onnx-community/whisper-${model}.en`;
+          const isCached = keys.some(key => key.includes(modelIdMulti) || key.includes(modelIdEn));
+          
+          console.log('🔍 Model availability check:', {
+            model,
+            isCached,
+            keysFound: keys.filter(k => k.includes('whisper')).length
+          });
+          
           db.close();
           resolve(isCached);
         };
@@ -421,5 +440,83 @@ export async function checkModelAvailability(model: WhisperModel): Promise<boole
     });
   } catch {
     return false;
+  }
+}
+
+/**
+ * Delete a model from IndexedDB cache and clear preferences
+ */
+export async function deleteModelCache(model: WhisperModel): Promise<void> {
+  try {
+    const dbName = 'transformers-cache';
+    
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(dbName);
+      
+      request.onsuccess = async () => {
+        const db = request.result;
+        
+        if (!db.objectStoreNames.contains('models')) {
+          db.close();
+          resolve();
+          return;
+        }
+        
+        const transaction = db.transaction(['models'], 'readwrite');
+        const store = transaction.objectStore('models');
+        const getAllKeysRequest = store.getAllKeys();
+        
+        getAllKeysRequest.onsuccess = async () => {
+          const keys = getAllKeysRequest.result as string[];
+          const modelIdMulti = `whisper-${model}`;
+          const modelIdEn = `whisper-${model}.en`;
+          
+          // Delete all keys related to this model
+          const keysToDelete = keys.filter(key => 
+            key.includes(modelIdMulti) || key.includes(modelIdEn)
+          );
+          
+          for (const key of keysToDelete) {
+            try {
+              store.delete(key);
+              console.log('🗑️ Deleted cache key:', key);
+            } catch (error) {
+              console.warn('Failed to delete key:', key, error);
+            }
+          }
+          
+          transaction.oncomplete = async () => {
+            db.close();
+            
+            // Clear preferences
+            try {
+              const { getTranscriptionDB } = await import('@/lib/transcriptionStorage');
+              const prefsDB = await getTranscriptionDB();
+              await prefsDB.delete('prefs', `model_${model}_ready`);
+              await prefsDB.delete('prefs', `model_${model}_device`);
+              console.log('✅ Cleared preferences for model:', model);
+            } catch (error) {
+              console.warn('Failed to clear preferences:', error);
+            }
+            
+            resolve();
+          };
+          
+          transaction.onerror = () => {
+            db.close();
+            reject(new Error('Failed to delete model from cache'));
+          };
+        };
+        
+        getAllKeysRequest.onerror = () => {
+          db.close();
+          reject(new Error('Failed to read cache keys'));
+        };
+      };
+      
+      request.onerror = () => reject(new Error('Failed to open IndexedDB'));
+    });
+  } catch (error) {
+    throw new Error(`Failed to delete model cache: ${error}`);
   }
 }

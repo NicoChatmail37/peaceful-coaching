@@ -149,7 +149,7 @@ class ModelDownloadService implements ModelDownloadManager {
     // The actual caching is handled by transformers.js internally
     
     const { pipeline } = await import('@huggingface/transformers');
-    const modelName = `onnx-community/whisper-${model}.en`;
+    const modelName = `onnx-community/whisper-${model}`; // Multilingual version (no .en suffix)
 
     // Check WebGPU availability first
     const webGPUAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;

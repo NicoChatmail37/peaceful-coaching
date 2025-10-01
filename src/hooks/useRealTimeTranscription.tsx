@@ -185,18 +185,21 @@ export const useRealTimeTranscription = ({
       audioLevelsRef.current.shift();
     }
     
-    // Update adaptive threshold with lower minimum (0.005 instead of 0.01)
-    const avgLevel = audioLevelsRef.current.reduce((a, b) => a + b, 0) / audioLevelsRef.current.length;
+    // Update adaptive threshold with lower minimum (0.003)
+    const avgLevel = audioLevelsRef.current.length > 0 
+      ? audioLevelsRef.current.reduce((a, b) => a + b, 0) / audioLevelsRef.current.length 
+      : 0.01;
     vadThresholdRef.current = Math.max(0.003, avgLevel * 0.3); // Lower threshold, 30% of average
     
     console.log('🎤 Audio level:', {
       current: audioLevel.toFixed(3),
       threshold: vadThresholdRef.current.toFixed(3),
-      avgLevel: avgLevel.toFixed(3)
+      avgLevel: avgLevel.toFixed(3),
+      blobSizeKB: Math.round(blob.size / 1024)
     });
     
-    // Voice Activity Detection
-    const hasActivity = audioLevel > vadThresholdRef.current;
+    // VAD with fallback: if audioLevel is 0 but blob is significant, treat as activity
+    const hasActivity = audioLevel > vadThresholdRef.current || (audioLevel === 0 && blob.size >= 10000);
     
     if (hasActivity) {
       lastActivityTimeRef.current = Date.now();
