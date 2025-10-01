@@ -18,8 +18,13 @@ interface CalendarPatientTabProps {
 export const CalendarPatientTab = ({ clientId, selectedDate, onDateChange }: CalendarPatientTabProps) => {
   const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
-  const { appointments } = useAppointments();
+  const { appointments, refreshAppointments } = useAppointments();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const handleAppointmentSuccess = () => {
+    setShowAppointmentDialog(false);
+    refreshAppointments(); // Force refresh after any appointment change
+  };
 
   const handleNewAppointment = () => {
     setEditingAppointment(null);
@@ -118,7 +123,7 @@ export const CalendarPatientTab = ({ clientId, selectedDate, onDateChange }: Cal
         appointment={editingAppointment}
         defaultDate={selectedDate}
         defaultClientId={clientId}
-        onSuccess={() => setShowAppointmentDialog(false)}
+        onSuccess={handleAppointmentSuccess}
       />
     </div>
   );

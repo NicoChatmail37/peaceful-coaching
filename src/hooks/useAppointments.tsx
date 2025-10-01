@@ -266,6 +266,7 @@ export const useAppointments = (startDate?: Date, endDate?: Date) => {
     appointments,
     loading,
     fetchAppointments,
+    refreshAppointments: fetchAppointments, // Alias for clarity
     createAppointment,
     updateAppointment,
     convertToSession,
