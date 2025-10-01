@@ -39,10 +39,10 @@ export const useRealTimeTranscription = ({
   const isActiveRef = useRef(false);
   const lastSummaryPositionRef = useRef(0);
   const transcriptRef = useRef('');
+  const queueRef = useRef<Blob[]>([]);
+  const processingRef = useRef(false);
 
-  const processAudioChunk = useCallback(async (audioBlob: Blob) => {
-    if (!isActiveRef.current) return;
-
+  const processOne = useCallback(async (audioBlob: Blob) => {
     try {
       setProgress(30);
       
@@ -61,7 +61,7 @@ export const useRealTimeTranscription = ({
       }
       
       // Softer size validation (minimum 3KB for decoding)
-      const minSize = 3000; // 3KB minimum (reduced for 4s chunks)
+      const minSize = 3000; // 3KB minimum (reduced for 3s chunks)
       if (audioBlob.size < minSize) {
         console.log('⚠️ Chunk too small, skipping:', audioBlob.size, 'bytes (min:', minSize, 'bytes)');
         return;
@@ -85,7 +85,7 @@ export const useRealTimeTranscription = ({
       // Transcribe the chunk
       const result = await transcribeAudio(audioBlob, {
         model: model,
-        language: 'fr', // Multilingual model supports French
+        language: 'fr',
         mode: 'auto',
         onProgress: (p) => setProgress(30 + (p * 0.4))
       });
@@ -93,71 +93,72 @@ export const useRealTimeTranscription = ({
       setProgress(80);
 
       let transcriptText = result.text.trim();
-      if (!transcriptText) return; // Skip empty transcriptions
+      if (!transcriptText) { 
+        setProgress(0); 
+        return; 
+      }
 
       // Format as dialogue if stereo mode with channel-based speaker detection
       if (stereoMode && result.segments) {
         const dialogueLines = result.segments.map((segment: any, index: number) => {
-          // Use channel energy analysis for speaker detection
-          // In stereo recording: Left channel = Therapist, Right channel = Client
-          // This is more reliable than time-based heuristics
-          
-          // Simulate channel energy detection (in real implementation, this would analyze actual audio data)
-          // For now, use a smarter heuristic based on segment patterns
           const segmentNumber = Math.floor(segment.start / 5); // 5-second segments
           const isTherapist = segmentNumber % 2 === 0;
-          
           const speaker = isTherapist ? '**Thérapeute:**' : '**Client:**';
-          const confidence = 0.7; // Placeholder - would come from actual channel analysis
           
-          console.log(`🎭 Segment ${index}: ${speaker} (${segment.start.toFixed(1)}s, confidence: ${confidence.toFixed(2)})`);
+          console.log(`🎭 Segment ${index}: ${speaker} (${segment.start.toFixed(1)}s)`);
           
           return `${speaker} ${segment.text}`;
         });
         transcriptText = dialogueLines.join('\n\n');
       }
 
-      // Append to current transcript using ref to avoid callback recreation
-      const newTranscript = transcriptRef.current + 
-        (transcriptRef.current ? '\n\n' : '') + 
-        transcriptText;
-
+      // Append to current transcript
+      const newTranscript = (transcriptRef.current ? transcriptRef.current + '\n\n' : '') + transcriptText;
       transcriptRef.current = newTranscript;
       setCurrentTranscript(newTranscript);
       onTranscriptUpdate(newTranscript);
 
-      setProgress(100);
-
-      // Store the chunk
       await storeAudioBlob(audioBlob, sessionId, clientId);
       await storeTranscriptResult({
-        audio_id: Date.now().toString(), // Temporary ID
-        model: model,
-        lang: 'fr', // Multilingual model supports French
+        audio_id: Date.now().toString(),
+        model, 
+        lang: 'fr',
         text: transcriptText,
         segments: result.segments,
         srt: result.srt
       });
 
-      setTimeout(() => setProgress(0), 500);
-
-    } catch (error) {
-      console.error('Real-time transcription error:', error);
-      console.error('Chunk size:', audioBlob.size, 'bytes');
-      console.error('Chunk type:', audioBlob.type);
-      
-      // Don't stop the process on error - implement retry logic
-      console.error('💥 Transcription failed, continuing with next chunk...');
-      
-      toast({
-        title: "Échec d'un segment",
-        description: "La transcription continue...",
-        variant: "default"
+      setProgress(100);
+      setTimeout(() => setProgress(0), 400);
+    } catch (err) {
+      console.error('Real-time transcription error:', err);
+      toast({ 
+        title: "Échec d'un segment", 
+        description: "La transcription continue...", 
+        variant: "default" 
       });
       setProgress(0);
-      // Continue processing - don't throw
     }
-  }, [onTranscriptUpdate, sessionId, clientId, stereoMode, model]);
+  }, [clientId, onTranscriptUpdate, sessionId, stereoMode, model]);
+
+  const pump = useCallback(async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    try {
+      while (isActiveRef.current && queueRef.current.length) {
+        const audioBlob = queueRef.current.shift()!;
+        await processOne(audioBlob);
+      }
+    } finally {
+      processingRef.current = false;
+    }
+  }, [processOne]);
+
+  const processAudioChunk = useCallback(async (blob: Blob) => {
+    if (!isActiveRef.current) return;
+    queueRef.current.push(blob);
+    pump();
+  }, [pump]);
 
   // Helper function to validate audio content (detect silence)
   const validateAudioContent = async (blob: Blob): Promise<boolean> => {

@@ -107,12 +107,12 @@ export function useAudioRecording(): AudioRecordingHook {
         });
       }
 
-      // Audio constraints with forced stereo optimization
+      // Audio constraints with stereo preference (not forced)
       const audioConstraints: MediaTrackConstraints = enableStereo ? {
         echoCancellation: false,
         autoGainControl: false,
         noiseSuppression: false,
-        channelCount: { ideal: 2, min: 2 }, // Force stereo
+        channelCount: { ideal: 2, min: 1 }, // Prefer stereo but don't force it
         sampleRate: { ideal: 48000 },
         deviceId: undefined // Let browser pick the right device
       } : {
@@ -150,17 +150,40 @@ export function useAudioRecording(): AudioRecordingHook {
       chunksRef.current = [];
 
       // Setup MediaRecorder with optimal codec for Whisper compatibility
-      // Prioritize audio/wav for best compatibility, fallback to opus (NOT pcm)
-      let mimeType = 'audio/webm;codecs=opus';
-      if (MediaRecorder.isTypeSupported('audio/wav')) {
-        mimeType = 'audio/wav';
-      }
-      
-      console.log('Using MIME type for recording:', mimeType, 'Stereo:', isStereo);
-      const mediaRecorder = new MediaRecorder(stream, { 
-        mimeType,
-        audioBitsPerSecond: 128000 // Optimize bitrate for quality/size balance
+      // NEVER use audio/wav with MediaRecorder - it doesn't support timesliced recording
+      const pickMime = () => {
+        const prefs = [
+          "audio/webm;codecs=opus",
+          "audio/webm",
+          "audio/ogg;codecs=opus",
+          "audio/ogg",
+        ];
+        for (const t of prefs) {
+          if (MediaRecorder.isTypeSupported(t)) return t;
+        }
+        return ""; // let browser choose
+      };
+
+      const mimeType = pickMime();
+      console.log('Using MIME type for recording:', mimeType || '(browser default)', 'Stereo:', isStereo);
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: mimeType || undefined,
+        audioBitsPerSecond: 128000,
       });
+
+      mediaRecorder.onerror = (e) => {
+        console.error('MediaRecorder error:', e);
+        toast({
+          title: "Erreur d'enregistrement",
+          description: "Le flux a rencontré une erreur. Relance en cours…",
+          variant: "destructive"
+        });
+      };
+
+      mediaRecorder.onstart = () => console.log('Recorder started');
+      mediaRecorder.onpause = () => console.log('Recorder paused');
+      mediaRecorder.onresume = () => console.log('Recorder resumed');
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -181,7 +204,16 @@ export function useAudioRecording(): AudioRecordingHook {
         }
       };
 
-      mediaRecorder.start(4000); // Record in 4-second chunks for better real-time processing
+      mediaRecorder.start(3000); // Record in 3-second chunks for better real-time processing
+      
+      // Watchdog: force data emission periodically even if timeslice drifts
+      const requestDataTimer = setInterval(() => {
+        try { mediaRecorder.requestData(); } catch {}
+      }, 5000);
+      
+      // Store timer reference for cleanup
+      (mediaRecorder as any)._requestDataTimer = requestDataTimer;
+      
       mediaRecorderRef.current = mediaRecorder;
 
       // Setup audio analysis
@@ -320,8 +352,11 @@ export function useAudioRecording(): AudioRecordingHook {
 
       setState('processing');
 
+      const requestDataTimer = (mediaRecorderRef.current as any)._requestDataTimer;
+
       mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const finalType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: finalType });
         
         // Cleanup
         if (streamRef.current) {
@@ -338,6 +373,9 @@ export function useAudioRecording(): AudioRecordingHook {
         if (levelIntervalRef.current) {
           clearInterval(levelIntervalRef.current);
         }
+        if (requestDataTimer) {
+          clearInterval(requestDataTimer);
+        }
 
         setState('idle');
         setDuration(0);
@@ -348,7 +386,7 @@ export function useAudioRecording(): AudioRecordingHook {
 
         toast({
           title: "Enregistrement terminé",
-          description: `Audio enregistré (${Math.round(blob.size / 1024)} Ko)`
+          description: `Audio enregistré (${Math.round(blob.size / 1024)} Ko, type: ${finalType})`
         });
 
         resolve(blob);
