@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { CompanyDropdown } from "@/components/CompanyDropdown";
 import { LogOut, User } from "lucide-react";
+import logo from "@/assets/logo-peaceful-code.jpg";
 
 export const Header = () => {
   const { user, signOut } = useAuth();
@@ -18,23 +19,19 @@ export const Header = () => {
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div 
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ 
-              background: activeCompany?.theme_color || '#0070f3',
-              boxShadow: `0 0 20px ${activeCompany?.theme_color || '#0070f3'}40`
-            }}
-          >
-            <span className="text-2xl">🇨🇭</span>
-          </div>
+          <img 
+            src={logo} 
+            alt="Peaceful Code Logo" 
+            className="w-12 h-12 rounded-lg object-cover"
+          />
           <div>
             <h1 className="text-xl font-bold text-foreground">
-              SwissInvoice
+              Peaceful Coaching
               <span className="text-xs text-muted-foreground ml-2 font-normal">
                 by Peaceful Code
               </span>
             </h1>
-            <p className="text-sm text-muted-foreground">Facturation professionnelle</p>
+            <p className="text-sm text-muted-foreground">Gestion de coaching professionnel</p>
           </div>
         </div>
         

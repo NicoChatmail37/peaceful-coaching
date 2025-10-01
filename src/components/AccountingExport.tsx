@@ -131,7 +131,7 @@ export const AccountingExport = ({ invoice }: AccountingExportProps) => {
         body: JSON.stringify({
           ...data,
           timestamp: new Date().toISOString(),
-          source: "SwissInvoice"
+          source: "Peaceful Coaching"
         }),
       });
 

@@ -300,7 +300,7 @@ ${selectedData.map(data => `  <invoice>
         body: JSON.stringify({
           invoices: selectedData,
           timestamp: new Date().toISOString(),
-          source: "SwissInvoice"
+          source: "Peaceful Coaching"
         }),
       });
 
