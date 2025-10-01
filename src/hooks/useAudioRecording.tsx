@@ -141,12 +141,24 @@ export function useAudioRecording(): AudioRecordingHook {
       streamRef.current = stream;
       chunksRef.current = [];
 
-      // Setup MediaRecorder with optimal codec
-      const mimeType = browserOptimal ? 'audio/webm;codecs=opus' : 'audio/webm';
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      // Setup MediaRecorder with optimal codec for Whisper compatibility
+      // Try audio/wav first for best compatibility, fallback to webm
+      let mimeType = 'audio/webm;codecs=opus';
+      if (MediaRecorder.isTypeSupported('audio/wav')) {
+        mimeType = 'audio/wav';
+      } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=pcm')) {
+        mimeType = 'audio/webm;codecs=pcm';
+      }
+      
+      console.log('Using MIME type for recording:', mimeType);
+      const mediaRecorder = new MediaRecorder(stream, { 
+        mimeType,
+        audioBitsPerSecond: 128000 // Optimize bitrate for quality/size balance
+      });
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
+          console.log('Audio chunk received:', event.data.size, 'bytes, type:', event.data.type);
           chunksRef.current.push(event.data);
           // Call real-time transcription callback if provided
           if (onAudioChunkRef.current && event.data.size > 0) {
@@ -155,7 +167,7 @@ export function useAudioRecording(): AudioRecordingHook {
         }
       };
 
-      mediaRecorder.start(5000); // Record in 5-second chunks for better transcription
+      mediaRecorder.start(10000); // Record in 10-second chunks for better stability
       mediaRecorderRef.current = mediaRecorder;
 
       // Setup audio analysis

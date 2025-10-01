@@ -43,11 +43,19 @@ export const useRealTimeTranscription = ({
     try {
       setProgress(30);
       
-      // Validate chunk size (minimum 1KB and 2 seconds estimated)
-      if (audioBlob.size < 1000) {
-        console.log('Chunk too small, skipping:', audioBlob.size, 'bytes');
+      // Validate chunk size (minimum 10KB for reliable decoding)
+      const minSize = 10000; // 10KB minimum
+      if (audioBlob.size < minSize) {
+        console.log('Chunk too small, skipping:', audioBlob.size, 'bytes (min:', minSize, 'bytes)');
         return;
       }
+
+      // Log detailed audio info for debugging
+      console.log('Processing audio chunk:', {
+        size: audioBlob.size,
+        type: audioBlob.type,
+        sizeKB: Math.round(audioBlob.size / 1024)
+      });
 
       // Transcribe the chunk
       const result = await transcribeAudio(audioBlob, {

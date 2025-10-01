@@ -190,6 +190,13 @@ export async function transcribeAudio(
   const audioUrl = URL.createObjectURL(audioBlob);
   
   try {
+    console.log('Transcribing audio:', {
+      size: audioBlob.size,
+      type: audioBlob.type,
+      model,
+      language
+    });
+
     // Build options - omit language if undefined for auto-detection
     const pipelineOptions: any = {
       return_timestamps: true,
@@ -205,6 +212,8 @@ export async function transcribeAudio(
     const result = await whisperPipeline(audioUrl, pipelineOptions);
 
     URL.revokeObjectURL(audioUrl);
+    
+    console.log('Transcription successful:', result.text?.substring(0, 100));
 
     // Convert result to our format
     const segments: TranscriptSegment[] = result.chunks?.map((chunk: any) => ({
@@ -224,7 +233,20 @@ export async function transcribeAudio(
     };
   } catch (error) {
     URL.revokeObjectURL(audioUrl);
-    throw new Error(`Transcription failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('Transcription error:', error);
+    console.error('Audio blob details:', {
+      size: audioBlob.size,
+      type: audioBlob.type,
+      sizeKB: Math.round(audioBlob.size / 1024)
+    });
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('decode')) {
+        throw new Error(`Format audio incompatible (${audioBlob.type}). Taille: ${Math.round(audioBlob.size / 1024)}KB`);
+      }
+    }
+    throw error;
   }
 }
 
