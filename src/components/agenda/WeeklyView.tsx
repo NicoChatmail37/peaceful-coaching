@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format, startOfWeek, addDays, isSameDay } from "date-fns";
+import { format, startOfWeek, addDays, isSameDay, isSameWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,14 @@ export const WeeklyView = ({
   onSelectAppointment,
   onEditAppointment
 }: WeeklyViewProps) => {
+  // Synchroniser weekStart avec selectedDate
   const [weekStart, setWeekStart] = useState(startOfWeek(selectedDate, { weekStartsOn: 1 }));
+  
+  // Mettre à jour weekStart quand selectedDate change
+  if (!isSameWeek(weekStart, selectedDate, { weekStartsOn: 1 })) {
+    setWeekStart(startOfWeek(selectedDate, { weekStartsOn: 1 }));
+  }
+  
   const daysToShow = 7; // Afficher 7 jours (du lundi au dimanche)
 
   const weekDays = Array.from({ length: daysToShow }, (_, i) => addDays(weekStart, i));
@@ -116,33 +123,47 @@ export const WeeklyView = ({
                     </div>
                   </div>
 
-                  <div className="space-y-1">
+                   <div className="space-y-1 max-h-[150px] overflow-y-auto">
                     {dayAppointments.length === 0 ? (
                       <div className="text-xs text-muted-foreground text-center py-2">
                         Aucun RDV
                       </div>
                     ) : (
-                      dayAppointments.map((apt) => (
-                        <div
-                          key={apt.id}
-                          className="text-xs p-1 rounded bg-primary/10 hover:bg-primary/20 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onEditAppointment) {
-                              onEditAppointment(apt);
-                            } else if (onSelectAppointment) {
-                              onSelectAppointment(apt);
-                            }
-                          }}
-                        >
-                          <div className="font-medium truncate">
-                            {format(new Date(apt.starts_at), "HH:mm")}
+                      <>
+                        {dayAppointments.map((apt) => (
+                          <div
+                            key={apt.id}
+                            className="text-xs p-1.5 rounded bg-primary/10 hover:bg-primary/20 cursor-pointer border border-primary/20 group"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onSelectAppointment) {
+                                onSelectAppointment(apt);
+                              }
+                            }}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">
+                                  {format(new Date(apt.starts_at), "HH:mm")}
+                                </div>
+                                <div className="truncate text-muted-foreground">
+                                  {apt.client_name}
+                                </div>
+                                {apt.title && (
+                                  <div className="truncate text-xs">
+                                    {apt.title}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div className="truncate text-muted-foreground">
-                            {apt.title || apt.client_name}
+                        ))}
+                        {dayAppointments.length > 3 && (
+                          <div className="text-center text-xs text-muted-foreground py-1">
+                            {dayAppointments.length} rendez-vous
                           </div>
-                        </div>
-                      ))
+                        )}
+                      </>
                     )}
                   </div>
                 </CardContent>

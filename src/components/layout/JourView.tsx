@@ -24,9 +24,9 @@ export const JourView = () => {
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-152px)]">
       {/* Sélecteur de recherche patient */}
-      <div className="h-14 border-b border-border bg-card px-4 flex items-center">
-        <div className="w-96">
-          <QuickSearch onClientSelect={handleClientSelect} />
+      <div className="h-14 border-b border-border bg-card px-4 flex items-center gap-4">
+        <div className="w-64">
+          <QuickSearch onClientSelect={handleClientSelect} selectedClientId={clientId} />
         </div>
       </div>
 
