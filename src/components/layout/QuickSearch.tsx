@@ -86,16 +86,9 @@ export const QuickSearch = ({ onClientSelect, selectedClientId }: QuickSearchPro
       </Popover>
       
       {activeClient && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-md border border-primary/20">
-          <User className="h-4 w-4 text-primary" />
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-primary">{activeClient.name}</span>
-            {activeClient.city && (
-              <span className="text-xs text-muted-foreground">
-                {activeClient.npa} {activeClient.city}
-              </span>
-            )}
-          </div>
+        <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-md border border-primary/20">
+          <User className="h-3 w-3 text-primary" />
+          <span className="text-sm font-medium text-primary">{activeClient.name}</span>
         </div>
       )}
     </div>

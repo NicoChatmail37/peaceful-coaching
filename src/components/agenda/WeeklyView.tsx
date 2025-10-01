@@ -141,7 +141,7 @@ export const WeeklyView = ({
                               }
                             }}
                           >
-                            <div className="flex items-start justify-between">
+                            <div className="flex items-start justify-between gap-1">
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium truncate">
                                   {format(new Date(apt.starts_at), "HH:mm")}
@@ -155,6 +155,19 @@ export const WeeklyView = ({
                                   </div>
                                 )}
                               </div>
+                              {onEditAppointment && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditAppointment(apt);
+                                  }}
+                                >
+                                  <Plus className="h-3 w-3 rotate-45" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ))}
