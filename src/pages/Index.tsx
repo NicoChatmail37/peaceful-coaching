@@ -38,11 +38,6 @@ const Index = () => {
   const handleTopTabChange = (value: string) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set('view', value);
-    // Conserver les autres paramètres si on reste sur la vue jour
-    if (value !== 'jour') {
-      newParams.delete('clientId');
-      newParams.delete('tab');
-    }
     setSearchParams(newParams);
   };
 
