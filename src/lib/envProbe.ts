@@ -1,4 +1,4 @@
-import { getBridgeStatus } from '@/lib/whisperService';
+import { getBridgeStatus, checkModelAvailability, type WhisperModel } from '@/lib/whisperService';
 
 export interface DeviceInfo {
   class: 'mobile' | 'laptop' | 'desktop';
@@ -41,20 +41,21 @@ export interface EnvironmentProbe {
 }
 
 /**
- * Détecte les modèles Whisper déjà en cache
+ * Détecte les modèles Whisper déjà en cache via IndexedDB
  */
 export async function getCachedModels(): Promise<CachedModels> {
   try {
-    // Check IndexedDB for cached HuggingFace models
-    const caches = await window.caches?.keys();
-    const hasCache = (model: string) => 
-      caches?.some(cacheName => cacheName.includes(`whisper-${model}`)) || false;
+    // Check IndexedDB for cached HuggingFace models using checkModelAvailability
+    const models: WhisperModel[] = ['tiny', 'base', 'small', 'medium'];
+    const results = await Promise.all(
+      models.map(model => checkModelAvailability(model))
+    );
 
     return {
-      tiny: hasCache('tiny'),
-      base: hasCache('base'),
-      small: hasCache('small'), // Bridge only, but can check
-      medium: false // Bridge only
+      tiny: results[0],
+      base: results[1],
+      small: results[2],
+      medium: results[3]
     };
   } catch (error) {
     console.debug('Cache detection failed:', error);

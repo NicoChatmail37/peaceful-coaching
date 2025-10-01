@@ -85,7 +85,7 @@ export const CompactRecordingBar = ({
     model: selectedModel
   });
 
-  // Check model cached status on mount
+  // Check model cached status on mount and sync with settings
   useEffect(() => {
     const checkModelStatus = async () => {
       const { checkModelAvailability } = await import('@/lib/whisperService');
@@ -109,6 +109,26 @@ export const CompactRecordingBar = ({
     };
     
     checkModelStatus();
+    
+    // Listen for model cache updates from IALocalSettings
+    const handleModelCacheUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { model } = customEvent.detail || {};
+      if (model) {
+        // Re-check the specific model
+        import('@/lib/whisperService').then(({ checkModelAvailability }) => {
+          checkModelAvailability(model).then((available) => {
+            setModelCachedStatus(prev => ({ ...prev, [model]: available }));
+          });
+        });
+      }
+    };
+    
+    window.addEventListener('modelCacheUpdated', handleModelCacheUpdate);
+    
+    return () => {
+      window.removeEventListener('modelCacheUpdated', handleModelCacheUpdate);
+    };
   }, []);
 
   const formatDuration = (seconds: number) => {

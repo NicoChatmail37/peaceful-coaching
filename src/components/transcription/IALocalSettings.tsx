@@ -125,6 +125,9 @@ export const IALocalSettings = () => {
       // Refresh statuses after download
       await loadEnvironmentAndPreferences();
       
+      // Dispatch custom event to sync with CompactRecordingBar
+      window.dispatchEvent(new CustomEvent('modelCacheUpdated', { detail: { model } }));
+      
       toast({
         title: "Téléchargement terminé ✅",
         description: `Le modèle ${model} est maintenant disponible pour la transcription`,
