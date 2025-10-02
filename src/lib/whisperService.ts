@@ -153,6 +153,12 @@ export async function transcribeAudio(
   audioBlob: Blob,
   options: TranscribeOptions = {}
 ): Promise<WhisperResult> {
+  console.log('🎯 transcribeAudio input:', {
+    type: audioBlob.type,
+    size: audioBlob.size,
+    sizeKB: Math.round(audioBlob.size / 1024)
+  });
+  
   const { model = 'tiny', language = 'en', mode = 'auto', onProgress } = options;
 
   // Determine transcription method

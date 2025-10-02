@@ -50,6 +50,12 @@ export const useRealTimeTranscription = ({
   const vadThresholdRef = useRef<number>(0.005); // Lower initial threshold
 
   const processOne = useCallback(async (audioBlob: Blob) => {
+    console.log('⏩ processOne start:', {
+      type: audioBlob.type,
+      size: audioBlob.size,
+      sizeKB: Math.round(audioBlob.size / 1024)
+    });
+    
     try {
       setProgress(30);
       
@@ -210,6 +216,8 @@ export const useRealTimeTranscription = ({
         variant: "default" 
       });
       setProgress(0);
+    } finally {
+      console.log('✅ processOne end');
     }
   }, [clientId, onTranscriptUpdate, sessionId, stereoMode, model]);
 
@@ -273,15 +281,25 @@ export const useRealTimeTranscription = ({
       
       // FORCED FLUSH: If buffer reaches 2 chunks (~6 seconds of continuous speech), flush it
       if (vadBufferRef.current.length >= 2) {
-        console.log('⚡ Forced flush (buffer full): concatenating', vadBufferRef.current.length, 'chunks');
+        console.log('⚡ Forced flush (buffer full):', vadBufferRef.current.length, 'chunks');
         
-        // Simple Blob concatenation (no conversion) - WebM/Opus is valid for Whisper
-        const concatenated = new Blob(vadBufferRef.current, { 
-          type: vadBufferRef.current[0].type || 'audio/webm' 
-        });
+        const TEST_NO_CONCAT = true; // flag de test
+        
+        if (TEST_NO_CONCAT) {
+          // Test: envoyer chaque chunk individuellement
+          console.log('🧪 TEST MODE: Sending chunks individually (no concat)');
+          for (const chunk of vadBufferRef.current) {
+            queueRef.current.push(chunk);
+          }
+        } else {
+          // Concat normal (WAV)
+          const concatenated = new Blob(vadBufferRef.current, { 
+            type: vadBufferRef.current[0].type || 'audio/wav'
+          });
+          queueRef.current.push(concatenated);
+        }
         
         vadBufferRef.current = [];
-        queueRef.current.push(concatenated);
         pump();
       }
     } else {
@@ -289,18 +307,28 @@ export const useRealTimeTranscription = ({
       
       // If we have buffered audio and 1.5s of silence, process the buffer
       if (vadBufferRef.current.length > 0 && timeSinceActivity > 1500) {
-        console.log('🔇 Silence detected, concatenating buffer...', {
+        console.log('🔇 Silence detected, processing buffer...', {
           bufferSize: vadBufferRef.current.length,
           silenceDuration: timeSinceActivity
         });
         
-        // Simple Blob concatenation (no conversion) - WebM/Opus is valid for Whisper
-        const concatenated = new Blob(vadBufferRef.current, { 
-          type: vadBufferRef.current[0].type || 'audio/webm' 
-        });
+        const TEST_NO_CONCAT = true; // flag de test
+        
+        if (TEST_NO_CONCAT) {
+          // Test: envoyer chaque chunk individuellement
+          console.log('🧪 TEST MODE: Sending chunks individually (no concat)');
+          for (const chunk of vadBufferRef.current) {
+            queueRef.current.push(chunk);
+          }
+        } else {
+          // Concat normal (WAV)
+          const concatenated = new Blob(vadBufferRef.current, { 
+            type: vadBufferRef.current[0].type || 'audio/wav'
+          });
+          queueRef.current.push(concatenated);
+        }
         
         vadBufferRef.current = [];
-        queueRef.current.push(concatenated);
         pump();
       }
     }
@@ -420,13 +448,23 @@ export const useRealTimeTranscription = ({
     if (vadBufferRef.current.length > 0) {
       console.log('🔄 Flushing pending VAD buffer...', vadBufferRef.current.length, 'chunks');
       
-      // Simple Blob concatenation (no conversion) - WebM/Opus is valid for Whisper
-      const concatenated = new Blob(vadBufferRef.current, { 
-        type: vadBufferRef.current[0].type || 'audio/webm' 
-      });
+      const TEST_NO_CONCAT = true; // flag de test
+      
+      if (TEST_NO_CONCAT) {
+        // Test: envoyer chaque chunk individuellement
+        console.log('🧪 TEST MODE: Sending chunks individually (no concat)');
+        for (const chunk of vadBufferRef.current) {
+          queueRef.current.push(chunk);
+        }
+      } else {
+        // Concat normal (WAV)
+        const concatenated = new Blob(vadBufferRef.current, { 
+          type: vadBufferRef.current[0].type || 'audio/wav'
+        });
+        queueRef.current.push(concatenated);
+      }
       
       vadBufferRef.current = [];
-      queueRef.current.push(concatenated);
     }
 
     // Wait for queue to empty (max 5s)
