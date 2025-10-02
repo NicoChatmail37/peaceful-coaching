@@ -65,17 +65,26 @@ export class AudioWorkletRecorder {
           // Already mono
           monoData = event.inputBuffer.getChannelData(0);
         } else {
-          // Stereo → Mono: use max absolute value to preserve dominant channel
+          // Stereo → Mono: RMS per buffer to choose dominant channel
+          // Prevents HF artifacts from sample-by-sample alternation
           const left = event.inputBuffer.getChannelData(0);
           const right = event.inputBuffer.getChannelData(1);
-          monoData = new Float32Array(left.length);
           
+          // Calculate RMS for each channel
+          let sumLeft = 0, sumRight = 0;
           for (let i = 0; i < left.length; i++) {
-            // Take the stronger signal (max absolute value) with its original sign
-            const absLeft = Math.abs(left[i]);
-            const absRight = Math.abs(right[i]);
-            monoData[i] = absLeft > absRight ? left[i] : right[i];
+            sumLeft += left[i] * left[i];
+            sumRight += right[i] * right[i];
           }
+          
+          // Choose dominant channel for entire buffer
+          const useLeft = sumLeft >= sumRight;
+          const sourceChannel = useLeft ? left : right;
+          
+          console.log('🎚️ Downmix', { picked: useLeft ? 'L' : 'R', rmsL: Math.sqrt(sumLeft / left.length).toFixed(4), rmsR: Math.sqrt(sumRight / right.length).toFixed(4) });
+          
+          monoData = new Float32Array(sourceChannel.length);
+          monoData.set(sourceChannel);
         }
         
         // Store a copy

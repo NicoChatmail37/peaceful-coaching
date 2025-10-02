@@ -81,7 +81,7 @@ export const CompactRecordingBar = ({
     sessionId,
     clientId,
     onTranscriptUpdate,
-    stereoMode: enableStereo,
+    stereoMode: false, // Force mono after RMS downmix
     model: selectedModel
   });
 

@@ -364,9 +364,13 @@ export const useRealTimeTranscription = ({
           description: suggestion,
           variant: "default"
         });
-        setProgress(0);
-        return;
+        // TEMPORARILY DISABLED: Allow processing to verify clean transcription after downmix fix
+        // setProgress(0);
+        // return;
       }
+      
+      // Log raw text before processing (debug)
+      console.log('📝 Raw transcription text:', transcriptText);
 
       // --- Robust stereo formatting with seg.t0 ---
       if (stereoMode && Array.isArray(result.segments) && result.segments.length) {
