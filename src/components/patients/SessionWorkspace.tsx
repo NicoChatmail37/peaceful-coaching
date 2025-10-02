@@ -153,12 +153,8 @@ export const SessionWorkspace = ({
         <CompactRecordingBar
           sessionId={session.id}
           clientId={patient.id}
-          onTranscriptUpdate={(text) => {
-            // Append or replace transcript
-            const newText = transcriptText ? 
-              transcriptText + '\n\n' + text : 
-              text;
-            setTranscriptText(newText);
+          onTranscriptUpdate={(fullText) => {
+            setTranscriptText(fullText);
           }}
           onSummaryGenerated={(summary) => {
             // Add summary to notes
