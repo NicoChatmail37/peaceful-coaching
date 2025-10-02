@@ -203,7 +203,7 @@ export function useAudioRecording(): AudioRecordingHook {
       // Create and start AudioWorkletRecorder (records original stream as WAV)
       recorderRef.current = new AudioWorkletRecorder({
         sampleRate: 16000, // Whisper optimal rate
-        timesliceMs: 3000, // Emit chunks every 3 seconds
+        timesliceMs: 6000, // Emit chunks every 6 seconds (reduced hallucinations)
         onChunk: (blob) => {
           console.log('📼 AW chunk received in hook', { 
             type: blob.type, 

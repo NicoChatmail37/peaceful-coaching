@@ -50,15 +50,37 @@ export class AudioWorkletRecorder {
 
       // Use ScriptProcessorNode (deprecated but more compatible than AudioWorklet)
       // Buffer size: 4096 samples
-      this.processorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
+      // Input channels: 2 (stereo), Output: 1 (mono)
+      const inputChannels = stream.getAudioTracks()[0]?.getSettings()?.channelCount || 2;
+      this.processorNode = this.audioContext.createScriptProcessor(4096, inputChannels, 1);
 
       this.processorNode.onaudioprocess = (event) => {
         if (!this.isRecording) return;
 
-        const inputData = event.inputBuffer.getChannelData(0);
+        const channelCount = event.inputBuffer.numberOfChannels;
+        
+        // Intelligent stereo downmix to mono
+        let monoData: Float32Array;
+        if (channelCount === 1) {
+          // Already mono
+          monoData = event.inputBuffer.getChannelData(0);
+        } else {
+          // Stereo → Mono: use max absolute value to preserve dominant channel
+          const left = event.inputBuffer.getChannelData(0);
+          const right = event.inputBuffer.getChannelData(1);
+          monoData = new Float32Array(left.length);
+          
+          for (let i = 0; i < left.length; i++) {
+            // Take the stronger signal (max absolute value) with its original sign
+            const absLeft = Math.abs(left[i]);
+            const absRight = Math.abs(right[i]);
+            monoData[i] = absLeft > absRight ? left[i] : right[i];
+          }
+        }
+        
         // Store a copy
-        this.recordedChunks.push(new Float32Array(inputData));
-        this.accumulatedSamples += inputData.length;
+        this.recordedChunks.push(new Float32Array(monoData));
+        this.accumulatedSamples += monoData.length;
 
         // Check if we have enough samples for a chunk (in native sample rate)
         const nativeSliceSamples = Math.floor(this.nativeSampleRate * (this.timesliceMs / 1000));
@@ -68,8 +90,13 @@ export class AudioWorkletRecorder {
         }
       };
 
+      // Create silent gain node to prevent audio feedback/echo
+      const silentNode = this.audioContext.createGain();
+      silentNode.gain.value = 0;
+      
       this.sourceNode.connect(this.processorNode);
-      this.processorNode.connect(this.audioContext.destination);
+      this.processorNode.connect(silentNode);
+      silentNode.connect(this.audioContext.destination);
 
       console.log('🎙️ AudioWorkletRecorder started (streaming mode)', {
         nativeSampleRate: this.audioContext.sampleRate,

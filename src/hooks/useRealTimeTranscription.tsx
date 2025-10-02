@@ -279,25 +279,15 @@ export const useRealTimeTranscription = ({
       vadBufferRef.current.push(blob);
       console.log('✅ Activity detected, buffering... (buffer size:', vadBufferRef.current.length, ')');
       
-      // FORCED FLUSH: If buffer reaches 2 chunks (~6 seconds of continuous speech), flush it
-      if (vadBufferRef.current.length >= 2) {
+      // FORCED FLUSH: If buffer reaches 3 chunks (~18 seconds of continuous speech), flush it
+      if (vadBufferRef.current.length >= 3) {
         console.log('⚡ Forced flush (buffer full):', vadBufferRef.current.length, 'chunks');
         
-        const TEST_NO_CONCAT = true; // flag de test
-        
-        if (TEST_NO_CONCAT) {
-          // Test: envoyer chaque chunk individuellement
-          console.log('🧪 TEST MODE: Sending chunks individually (no concat)');
-          for (const chunk of vadBufferRef.current) {
-            queueRef.current.push(chunk);
-          }
-        } else {
-          // Concat normal (WAV)
-          const concatenated = new Blob(vadBufferRef.current, { 
-            type: vadBufferRef.current[0].type || 'audio/wav'
-          });
-          queueRef.current.push(concatenated);
-        }
+        // Concat WAV blobs
+        const concatenated = new Blob(vadBufferRef.current, { 
+          type: vadBufferRef.current[0].type || 'audio/wav'
+        });
+        queueRef.current.push(concatenated);
         
         vadBufferRef.current = [];
         pump();
@@ -312,21 +302,11 @@ export const useRealTimeTranscription = ({
           silenceDuration: timeSinceActivity
         });
         
-        const TEST_NO_CONCAT = true; // flag de test
-        
-        if (TEST_NO_CONCAT) {
-          // Test: envoyer chaque chunk individuellement
-          console.log('🧪 TEST MODE: Sending chunks individually (no concat)');
-          for (const chunk of vadBufferRef.current) {
-            queueRef.current.push(chunk);
-          }
-        } else {
-          // Concat normal (WAV)
-          const concatenated = new Blob(vadBufferRef.current, { 
-            type: vadBufferRef.current[0].type || 'audio/wav'
-          });
-          queueRef.current.push(concatenated);
-        }
+        // Concat WAV blobs
+        const concatenated = new Blob(vadBufferRef.current, { 
+          type: vadBufferRef.current[0].type || 'audio/wav'
+        });
+        queueRef.current.push(concatenated);
         
         vadBufferRef.current = [];
         pump();
@@ -448,21 +428,11 @@ export const useRealTimeTranscription = ({
     if (vadBufferRef.current.length > 0) {
       console.log('🔄 Flushing pending VAD buffer...', vadBufferRef.current.length, 'chunks');
       
-      const TEST_NO_CONCAT = true; // flag de test
-      
-      if (TEST_NO_CONCAT) {
-        // Test: envoyer chaque chunk individuellement
-        console.log('🧪 TEST MODE: Sending chunks individually (no concat)');
-        for (const chunk of vadBufferRef.current) {
-          queueRef.current.push(chunk);
-        }
-      } else {
-        // Concat normal (WAV)
-        const concatenated = new Blob(vadBufferRef.current, { 
-          type: vadBufferRef.current[0].type || 'audio/wav'
-        });
-        queueRef.current.push(concatenated);
-      }
+      // Concat WAV blobs
+      const concatenated = new Blob(vadBufferRef.current, { 
+        type: vadBufferRef.current[0].type || 'audio/wav'
+      });
+      queueRef.current.push(concatenated);
       
       vadBufferRef.current = [];
     }

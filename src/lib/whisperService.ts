@@ -227,6 +227,8 @@ export async function transcribeAudio(
 
     // Build options - omit language if undefined for auto-detection
     const pipelineOptions: any = {
+      task: 'transcribe',
+      temperature: 0,
       return_timestamps: true,
       chunk_length_s: 30,
       stride_length_s: 5,
