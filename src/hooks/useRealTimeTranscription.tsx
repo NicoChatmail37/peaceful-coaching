@@ -214,14 +214,25 @@ export const useRealTimeTranscription = ({
   }, [clientId, onTranscriptUpdate, sessionId, stereoMode, model]);
 
   const pump = useCallback(async () => {
-    if (processingRef.current) return;
+    if (processingRef.current) {
+      console.log('⏸️ Pump already running, skipping...');
+      return;
+    }
+    
+    console.log('🚀 Pump started, queue size:', queueRef.current.length);
     processingRef.current = true;
+    
     try {
       while (queueRef.current.length) {
-        console.log('🔄 Pump running, queue size:', queueRef.current.length);
         const audioBlob = queueRef.current.shift()!;
+        console.log('🎙️ Processing audio chunk from queue:', {
+          size: audioBlob.size,
+          type: audioBlob.type,
+          sizeKB: Math.round(audioBlob.size / 1024)
+        });
         await processOne(audioBlob);
       }
+      console.log('✅ Pump finished');
     } finally {
       processingRef.current = false;
     }
@@ -260,8 +271,8 @@ export const useRealTimeTranscription = ({
       vadBufferRef.current.push(blob);
       console.log('✅ Activity detected, buffering... (buffer size:', vadBufferRef.current.length, ')');
       
-      // FORCED FLUSH: If buffer reaches 3 chunks (~9 seconds of continuous speech), flush it
-      if (vadBufferRef.current.length >= 3) {
+      // FORCED FLUSH: If buffer reaches 2 chunks (~6 seconds of continuous speech), flush it
+      if (vadBufferRef.current.length >= 2) {
         console.log('⚡ Forced flush (buffer full): concatenating', vadBufferRef.current.length, 'chunks');
         
         // Simple Blob concatenation (no conversion) - WebM/Opus is valid for Whisper
@@ -276,8 +287,8 @@ export const useRealTimeTranscription = ({
     } else {
       const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
       
-      // If we have buffered audio and 2.5s of silence, process the buffer
-      if (vadBufferRef.current.length > 0 && timeSinceActivity > 2500) {
+      // If we have buffered audio and 1.5s of silence, process the buffer
+      if (vadBufferRef.current.length > 0 && timeSinceActivity > 1500) {
         console.log('🔇 Silence detected, concatenating buffer...', {
           bufferSize: vadBufferRef.current.length,
           silenceDuration: timeSinceActivity
