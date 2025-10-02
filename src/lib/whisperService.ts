@@ -271,54 +271,219 @@ export async function transcribeAudio(
 }
 
 /**
- * Convert audio blob to WAV format using Web Audio API
- * This is necessary because Whisper.js requires PCM WAV format
+ * Merge multiple compressed audio chunks into a single 16kHz mono WAV
+ * This is CRITICAL: concatenating compressed audio (webm/mp4/ogg) creates invalid containers
+ * Instead, decode each chunk independently, then merge the PCM data
  */
-async function convertToWav(audioBlob: Blob): Promise<Blob> {
-  console.log('🎧 Converting audio:', {
+export async function mergeChunksToWav(chunks: Blob[]): Promise<Blob> {
+  if (chunks.length === 0) {
+    throw new Error('No chunks to merge');
+  }
+  
+  if (chunks.length === 1) {
+    // Single chunk: just convert it
+    return convertToWavOfflineMono16k(chunks[0]);
+  }
+  
+  console.log('🔗 Merging', chunks.length, 'chunks into single 16kHz mono WAV...');
+  
+  const targetSr = 16000;
+  const decodedBuffers: AudioBuffer[] = [];
+  let totalDuration = 0;
+  let skippedCount = 0;
+  
+  // Decode each chunk independently
+  for (let i = 0; i < chunks.length; i++) {
+    try {
+      const arrayBuffer = await chunks[i].arrayBuffer();
+      const audioContext = new AudioContext();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      await audioContext.close();
+      
+      decodedBuffers.push(audioBuffer);
+      totalDuration += audioBuffer.duration;
+      
+      console.log(`  ✓ Chunk ${i+1}/${chunks.length}: ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.numberOfChannels}ch, ${audioBuffer.sampleRate}Hz`);
+    } catch (err) {
+      console.warn(`  ✗ Chunk ${i+1}/${chunks.length} decode failed (skipping):`, err);
+      skippedCount++;
+    }
+  }
+  
+  if (decodedBuffers.length === 0) {
+    throw new Error('All chunks failed to decode');
+  }
+  
+  console.log(`📊 Decoded ${decodedBuffers.length}/${chunks.length} chunks (skipped: ${skippedCount}), total duration: ${totalDuration.toFixed(2)}s`);
+  
+  // Calculate total samples at target sample rate
+  const totalSamples = Math.ceil(totalDuration * targetSr);
+  
+  // Create offline context for resampling and merging
+  const offlineCtx = new OfflineAudioContext(1, totalSamples, targetSr);
+  
+  let currentTime = 0;
+  
+  for (const buffer of decodedBuffers) {
+    // Create source for this buffer
+    const source = offlineCtx.createBufferSource();
+    
+    // Downmix to mono if needed
+    const monoBuffer = offlineCtx.createBuffer(1, buffer.length, buffer.sampleRate);
+    const monoData = monoBuffer.getChannelData(0);
+    
+    if (buffer.numberOfChannels === 1) {
+      // Already mono
+      monoData.set(buffer.getChannelData(0));
+    } else {
+      // Mix stereo to mono
+      const L = buffer.getChannelData(0);
+      const R = buffer.getChannelData(1);
+      for (let i = 0; i < buffer.length; i++) {
+        monoData[i] = 0.5 * (L[i] + R[i]);
+      }
+    }
+    
+    source.buffer = monoBuffer;
+    source.connect(offlineCtx.destination);
+    source.start(currentTime);
+    
+    currentTime += buffer.duration;
+  }
+  
+  // Render the merged and resampled audio
+  const renderedBuffer = await offlineCtx.startRendering();
+  
+  console.log('✅ Merged audio:', {
+    samples: renderedBuffer.length,
+    sampleRate: renderedBuffer.sampleRate,
+    duration: renderedBuffer.duration.toFixed(2) + 's',
+    channels: renderedBuffer.numberOfChannels
+  });
+  
+  // Convert to 16-bit PCM WAV
+  return audioBufferToWav16BitMono(renderedBuffer);
+}
+
+/**
+ * Convert audio blob to 16kHz mono WAV format using OfflineAudioContext
+ * This is optimized for Whisper: 16kHz mono reduces file size by ~75% with no quality loss
+ */
+async function convertToWavOfflineMono16k(audioBlob: Blob): Promise<Blob> {
+  console.log('🎧 Converting to 16kHz mono WAV:', {
     inputType: audioBlob.type,
     inputSizeKB: Math.round(audioBlob.size / 1024)
   });
   
   const arrayBuffer = await audioBlob.arrayBuffer();
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const audioContext = new AudioContext();
   
   try {
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
-    console.log('🎵 Decoded audio buffer:', {
-      channels: audioBuffer.numberOfChannels,
-      sampleRate: audioBuffer.sampleRate,
-      duration: audioBuffer.duration.toFixed(2) + 's',
-      samples: audioBuffer.length
-    });
-    
-    // Convert to WAV with proper PCM encoding
-    const wavBlob = audioBufferToWav(audioBuffer);
-    
-    console.log('✅ WAV conversion complete:', {
-      originalSize: audioBlob.size,
-      convertedSize: wavBlob.size,
-      channels: audioBuffer.numberOfChannels,
-      sampleRate: audioBuffer.sampleRate,
-      duration: audioBuffer.duration
-    });
-    
     await audioContext.close();
-    return wavBlob;
+    
+    console.log('🎵 Decoded:', {
+      channels: audioBuffer.numberOfChannels,
+      sampleRate: audioBuffer.sampleRate,
+      duration: audioBuffer.duration.toFixed(2) + 's'
+    });
+    
+    // Check if already 16kHz mono WAV - skip conversion
+    if (audioBuffer.sampleRate === 16000 && audioBuffer.numberOfChannels === 1 && audioBlob.type.includes('wav')) {
+      console.log('⚡ Already 16kHz mono WAV, skipping conversion');
+      return audioBlob;
+    }
+    
+    // Resample to 16kHz mono using OfflineAudioContext
+    const targetSr = 16000;
+    const length = Math.ceil(audioBuffer.duration * targetSr);
+    const offlineCtx = new OfflineAudioContext(1, length, targetSr);
+    
+    const source = offlineCtx.createBufferSource();
+    
+    // Downmix to mono
+    const monoBuffer = offlineCtx.createBuffer(1, audioBuffer.length, audioBuffer.sampleRate);
+    const monoData = monoBuffer.getChannelData(0);
+    
+    if (audioBuffer.numberOfChannels === 1) {
+      monoData.set(audioBuffer.getChannelData(0));
+    } else {
+      const L = audioBuffer.getChannelData(0);
+      const R = audioBuffer.getChannelData(1);
+      for (let i = 0; i < audioBuffer.length; i++) {
+        monoData[i] = 0.5 * (L[i] + R[i]);
+      }
+    }
+    
+    source.buffer = monoBuffer;
+    source.connect(offlineCtx.destination);
+    source.start();
+    
+    const rendered = await offlineCtx.startRendering();
+    
+    console.log('✅ Resampled to 16kHz mono:', {
+      samples: rendered.length,
+      duration: rendered.duration.toFixed(2) + 's',
+      originalSizeKB: Math.round(audioBlob.size / 1024)
+    });
+    
+    return audioBufferToWav16BitMono(rendered);
   } catch (error) {
     await audioContext.close();
-    console.error('❌ Audio decode error:', {
+    console.error('❌ Audio conversion failed:', {
       error,
       blobType: audioBlob.type,
       blobSize: audioBlob.size
     });
-    throw new Error(`Impossible de décoder l'audio (${audioBlob.type}): ${error}`);
+    throw new Error(`Échec de conversion audio (${audioBlob.type}): ${error}`);
   }
 }
 
+// For backward compatibility (now uses the optimized version)
+async function convertToWav(audioBlob: Blob): Promise<Blob> {
+  return convertToWavOfflineMono16k(audioBlob);
+}
+
 /**
- * Convert AudioBuffer to WAV blob
+ * Convert AudioBuffer to 16-bit mono WAV blob (optimized for Whisper)
+ */
+function audioBufferToWav16BitMono(audioBuffer: AudioBuffer): Blob {
+  const sampleRate = audioBuffer.sampleRate;
+  const numSamples = audioBuffer.length;
+  const buffer = new ArrayBuffer(44 + numSamples * 2); // 16-bit = 2 bytes per sample
+  const view = new DataView(buffer);
+  
+  // WAV header for mono 16-bit PCM
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true); // PCM
+  view.setUint16(20, 1, true);  // Audio format (PCM)
+  view.setUint16(22, 1, true);  // Mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // Byte rate
+  view.setUint16(32, 2, true);  // Block align
+  view.setUint16(34, 16, true); // Bits per sample
+  writeString(view, 36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+  
+  // Write PCM samples
+  const channelData = audioBuffer.getChannelData(0);
+  let offset = 44;
+  for (let i = 0; i < numSamples; i++) {
+    const sample = Math.max(-1, Math.min(1, channelData[i]));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+    offset += 2;
+  }
+  
+  const wavBlob = new Blob([buffer], { type: 'audio/wav' });
+  console.log('📦 WAV created:', Math.round(wavBlob.size / 1024), 'KB');
+  return wavBlob;
+}
+
+/**
+ * Convert AudioBuffer to WAV blob (legacy multi-channel support)
  */
 function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
   const numberOfChannels = audioBuffer.numberOfChannels;

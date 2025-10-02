@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { transcribeAudio, type WhisperModel } from "@/lib/whisperService";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { transcribeAudio, mergeChunksToWav, type WhisperModel } from "@/lib/whisperService";
 import { generateSummary } from "@/lib/llmService";
 import { storeAudioBlob, storeTranscriptResult } from "@/lib/transcriptionStorage";
 import { toast } from "@/hooks/use-toast";
@@ -84,24 +84,64 @@ export const useRealTimeTranscription = ({
         return; 
       }
 
-      // --- Anti-hallucination guard: detect excessive trigram repetitions ---
-      const repeatedTrigram = (() => {
-        const words = transcriptText.split(/\s+/);
-        let streak = 1;
-        for (let i = 3; i < words.length; i++) {
-          const a = words.slice(i-3, i).join(" ").toLowerCase();
-          const b = words.slice(i-2, i+1).join(" ").toLowerCase();
-          if (a === b) { 
-            streak++; 
-            if (streak > 10) return true; 
-          } else { 
-            streak = 1; 
+      // --- Enhanced anti-hallucination guard: detect word repetitions (1-3 words) ---
+      const hasRepetition = (() => {
+        const words = transcriptText.split(/\s+/).map(w => w.toLowerCase());
+        
+        // Check 1-word repetitions (e.g., "et et et et...")
+        for (let i = 1; i < words.length; i++) {
+          if (words[i] === words[i-1]) {
+            let streak = 2;
+            for (let j = i+1; j < words.length && words[j] === words[i]; j++) {
+              streak++;
+            }
+            if (streak >= 4) {
+              console.warn(`🧹 1-word repetition detected: "${words[i]}" x${streak}`);
+              return true;
+            }
           }
         }
+        
+        // Check 2-word repetitions (e.g., "merci beaucoup merci beaucoup...")
+        for (let i = 2; i < words.length; i += 2) {
+          const bigram = words.slice(i-2, i).join(" ");
+          let streak = 1;
+          for (let j = i; j < words.length - 1; j += 2) {
+            const nextBigram = words.slice(j, j+2).join(" ");
+            if (nextBigram === bigram) {
+              streak++;
+              if (streak >= 3) {
+                console.warn(`🧹 2-word repetition detected: "${bigram}" x${streak}`);
+                return true;
+              }
+            } else {
+              break;
+            }
+          }
+        }
+        
+        // Check 3-word repetitions
+        for (let i = 3; i < words.length; i++) {
+          const trigram = words.slice(i-3, i).join(" ");
+          let streak = 1;
+          for (let j = i; j < words.length - 2; j += 3) {
+            const nextTrigram = words.slice(j, j+3).join(" ");
+            if (nextTrigram === trigram) {
+              streak++;
+              if (streak >= 3) {
+                console.warn(`🧹 3-word repetition detected: "${trigram}" x${streak}`);
+                return true;
+              }
+            } else {
+              break;
+            }
+          }
+        }
+        
         return false;
       })();
       
-      if (repeatedTrigram) {
+      if (hasRepetition) {
         console.warn("🧹 Segment ignoré (répétitions détectées - hallucination du modèle)");
         toast({
           title: "Segment ignoré",
@@ -208,28 +248,36 @@ export const useRealTimeTranscription = ({
       
       // FORCED FLUSH: If buffer reaches 3 chunks (~9 seconds of continuous speech), flush it
       if (vadBufferRef.current.length >= 3) {
-        console.log('⚡ Forced flush (buffer full): processing', vadBufferRef.current.length, 'chunks');
-        const mergedBlob = new Blob(vadBufferRef.current, { type: vadBufferRef.current[0].type });
-        vadBufferRef.current = [];
-        queueRef.current.push(mergedBlob);
-        pump();
+        console.log('⚡ Forced flush (buffer full): merging', vadBufferRef.current.length, 'chunks to WAV');
+        try {
+          const mergedWav = await mergeChunksToWav(vadBufferRef.current);
+          vadBufferRef.current = [];
+          queueRef.current.push(mergedWav);
+          pump();
+        } catch (err) {
+          console.error('❌ Failed to merge chunks:', err);
+          vadBufferRef.current = []; // Clear buffer to prevent stuck state
+        }
       }
     } else {
       const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
       
       // If we have buffered audio and 2.5s of silence, process the buffer
       if (vadBufferRef.current.length > 0 && timeSinceActivity > 2500) {
-        console.log('🔇 Silence detected after activity, processing buffer...', {
+        console.log('🔇 Silence detected after activity, merging buffer to WAV...', {
           bufferSize: vadBufferRef.current.length,
           silenceDuration: timeSinceActivity
         });
         
-        // Merge buffered chunks into one
-        const mergedBlob = new Blob(vadBufferRef.current, { type: vadBufferRef.current[0].type });
-        vadBufferRef.current = [];
-        
-        queueRef.current.push(mergedBlob);
-        pump();
+        try {
+          const mergedWav = await mergeChunksToWav(vadBufferRef.current);
+          vadBufferRef.current = [];
+          queueRef.current.push(mergedWav);
+          pump();
+        } catch (err) {
+          console.error('❌ Failed to merge chunks:', err);
+          vadBufferRef.current = []; // Clear buffer to prevent stuck state
+        }
       }
     }
   }, [pump]);
@@ -273,9 +321,13 @@ export const useRealTimeTranscription = ({
     });
   }, []);
 
-  const stopRealTimeTranscription = useCallback(() => {
+  const stopRealTimeTranscription = useCallback(async () => {
     setIsTranscribing(false);
     isActiveRef.current = false;
+    
+    // Flush any pending audio before stopping
+    await flushPendingChunk();
+    
     setProgress(0);
 
     toast({
@@ -342,9 +394,14 @@ export const useRealTimeTranscription = ({
     // Flush any remaining VAD buffer
     if (vadBufferRef.current.length > 0) {
       console.log('🔄 Flushing pending VAD buffer...', vadBufferRef.current.length, 'chunks');
-      const mergedBlob = new Blob(vadBufferRef.current, { type: vadBufferRef.current[0].type });
-      vadBufferRef.current = [];
-      queueRef.current.push(mergedBlob);
+      try {
+        const mergedWav = await mergeChunksToWav(vadBufferRef.current);
+        vadBufferRef.current = [];
+        queueRef.current.push(mergedWav);
+      } catch (err) {
+        console.error('❌ Failed to merge chunks during flush:', err);
+        vadBufferRef.current = [];
+      }
     }
 
     // Wait for queue to empty (max 5s)
@@ -356,6 +413,30 @@ export const useRealTimeTranscription = ({
     
     console.log('✅ Flush complete. Queue empty:', queueRef.current.length === 0);
   }, []);
+
+  // Reset state when switching clients/sessions or changing settings
+  useEffect(() => {
+    console.log('🔄 Context changed, resetting transcription state...', {
+      clientId,
+      sessionId,
+      model,
+      stereoMode
+    });
+    
+    // Clear all buffers and state
+    vadBufferRef.current = [];
+    queueRef.current = [];
+    audioLevelsRef.current = [];
+    lastActivityTimeRef.current = Date.now();
+    transcriptRef.current = '';
+    setCurrentTranscript('');
+    lastSummaryPositionRef.current = 0;
+    processingRef.current = false;
+    isActiveRef.current = false;
+    setIsTranscribing(false);
+    setProgress(0);
+    
+  }, [clientId, sessionId, model, stereoMode]);
 
   return {
     isTranscribing,

@@ -219,33 +219,74 @@ export function useAudioRecording(): AudioRecordingHook {
 
       // === Setup MediaRecorder on the PROCESSED stream ===
       const pickMime = () => {
-        const prefs = [
-          "audio/webm;codecs=opus",
-          "audio/webm",
-          "audio/ogg;codecs=opus",
-          "audio/ogg",
-          "audio/mp4;codecs=mp4a.40.2", // AAC in MP4 (Safari/macOS)
-          "audio/mp4",                   // Generic MP4
-          "audio/mpeg",                  // MP3
-          "audio/mp3",                   // Alternative MP3
-        ];
+        // Browser-specific MIME type preferences (based on User Agent)
+        const ua = navigator.userAgent;
+        const isChrome = /Chrome/.test(ua) && /Google Inc/.test(navigator.vendor);
+        const isEdge = /Edg/.test(ua);
+        const isFirefox = /Firefox/.test(ua);
+        const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua);
+        
+        let prefs: string[] = [];
+        
+        if (isChrome || isEdge) {
+          // Chrome/Edge: Prefer Opus in WebM
+          prefs = [
+            "audio/webm;codecs=opus",
+            "audio/webm",
+            "audio/ogg;codecs=opus",
+            "audio/mp4;codecs=mp4a.40.2",
+          ];
+        } else if (isFirefox) {
+          // Firefox: Prefer Opus in Ogg
+          prefs = [
+            "audio/ogg;codecs=opus",
+            "audio/webm;codecs=opus",
+            "audio/webm",
+          ];
+        } else if (isSafari) {
+          // Safari: Prefer AAC in MP4
+          prefs = [
+            "audio/mp4;codecs=mp4a.40.2",
+            "audio/mp4",
+            "audio/webm;codecs=opus",
+          ];
+        } else {
+          // Generic fallback
+          prefs = [
+            "audio/webm;codecs=opus",
+            "audio/webm",
+            "audio/ogg;codecs=opus",
+            "audio/mp4;codecs=mp4a.40.2",
+          ];
+        }
+        
+        console.log('🌐 Browser detected:', { isChrome, isEdge, isFirefox, isSafari });
+        
         for (const t of prefs) {
           if (MediaRecorder.isTypeSupported(t)) {
-            console.log('🎤 Selected MIME type:', t);
+            console.log('✅ Selected MIME type:', t);
             return t;
           }
         }
-        console.log('🎤 Using browser default MIME type');
+        
+        console.log('⚠️ Using browser default MIME type');
         return ""; // let browser choose
       };
 
       const mimeType = pickMime();
-      console.log('📼 Using MIME type for recording:', mimeType || '(browser default)', 'Stereo:', isStereo);
 
       // Record the PROCESSED stream, not the original
       const mediaRecorder = new MediaRecorder(destination.stream, {
         mimeType: mimeType || undefined,
         audioBitsPerSecond: 128000,
+      });
+      
+      // Log the effective MIME type used by the MediaRecorder
+      console.log('📼 MediaRecorder initialized:', {
+        requestedMime: mimeType || '(browser default)',
+        effectiveMime: mediaRecorder.mimeType,
+        stereo: isStereo,
+        channels: actualChannels
       });
 
       mediaRecorder.onerror = (e) => {
