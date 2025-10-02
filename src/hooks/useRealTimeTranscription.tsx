@@ -85,6 +85,11 @@ export const useRealTimeTranscription = ({
       }
 
       // --- Enhanced anti-hallucination guard: detect word repetitions (1-3 words) ---
+      // Adaptive thresholds based on model (base is more lenient with natural speech)
+      const thresholds = model === 'base' 
+        ? { oneWord: 6, twoWord: 4, threeWord: 4 }
+        : { oneWord: 4, twoWord: 3, threeWord: 3 };
+      
       const hasRepetition = (() => {
         const words = transcriptText.split(/\s+/).map(w => w.toLowerCase());
         
@@ -95,8 +100,8 @@ export const useRealTimeTranscription = ({
             for (let j = i+1; j < words.length && words[j] === words[i]; j++) {
               streak++;
             }
-            if (streak >= 4) {
-              console.warn(`🧹 1-word repetition detected: "${words[i]}" x${streak}`);
+            if (streak >= thresholds.oneWord) {
+              console.warn(`🧹 1-word repetition detected: "${words[i]}" x${streak} (threshold: ${thresholds.oneWord})`);
               return true;
             }
           }
@@ -110,8 +115,8 @@ export const useRealTimeTranscription = ({
             const nextBigram = words.slice(j, j+2).join(" ");
             if (nextBigram === bigram) {
               streak++;
-              if (streak >= 3) {
-                console.warn(`🧹 2-word repetition detected: "${bigram}" x${streak}`);
+              if (streak >= thresholds.twoWord) {
+                console.warn(`🧹 2-word repetition detected: "${bigram}" x${streak} (threshold: ${thresholds.twoWord})`);
                 return true;
               }
             } else {
@@ -128,8 +133,8 @@ export const useRealTimeTranscription = ({
             const nextTrigram = words.slice(j, j+3).join(" ");
             if (nextTrigram === trigram) {
               streak++;
-              if (streak >= 3) {
-                console.warn(`🧹 3-word repetition detected: "${trigram}" x${streak}`);
+              if (streak >= thresholds.threeWord) {
+                console.warn(`🧹 3-word repetition detected: "${trigram}" x${streak} (threshold: ${thresholds.threeWord})`);
                 return true;
               }
             } else {
@@ -143,9 +148,17 @@ export const useRealTimeTranscription = ({
       
       if (hasRepetition) {
         console.warn("🧹 Segment ignoré (répétitions détectées - hallucination du modèle)");
+        
+        // Adaptive message based on current model
+        const suggestion = model === 'tiny' 
+          ? "Répétitions détectées. Essayez le modèle 'base' pour plus de précision."
+          : model === 'base'
+          ? "Répétitions détectées (hallucination du modèle). Segment ignoré."
+          : "Répétitions détectées. Essayez un modèle plus robuste (base ou large).";
+        
         toast({
           title: "Segment ignoré",
-          description: "Répétitions détectées. Essayez le modèle 'base' pour plus de précision.",
+          description: suggestion,
           variant: "default"
         });
         setProgress(0);
