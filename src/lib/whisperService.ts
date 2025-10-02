@@ -187,12 +187,12 @@ export async function transcribeAudio(
     await initWhisper(model, onProgress);
   }
 
-  // Convert audio to WAV format if needed (Whisper requires WAV/PCM)
+  // Only convert audio if it's not in a Whisper-compatible format
   let processedBlob = audioBlob;
   const audioType = audioBlob.type.toLowerCase();
   
-  // Convert ANY non-WAV format to WAV (Safari/macOS uses mp4/m4a, Chrome uses webm, etc.)
-  if (!audioType.includes('wav')) {
+  // Whisper supports: WAV, WebM/Opus, and OGG - no conversion needed
+  if (!audioType.includes('wav') && !audioType.includes('webm') && !audioType.includes('ogg')) {
     console.log('🔄 Converting audio from', audioBlob.type, 'to WAV for Whisper...');
     try {
       processedBlob = await convertToWav(audioBlob);
@@ -205,6 +205,8 @@ export async function transcribeAudio(
       console.error('❌ Audio conversion failed:', conversionError);
       throw new Error(`Échec de conversion audio: ${conversionError}`);
     }
+  } else {
+    console.log('✅ Audio format compatible with Whisper:', audioBlob.type);
   }
 
   const audioUrl = URL.createObjectURL(processedBlob);
@@ -271,9 +273,13 @@ export async function transcribeAudio(
 }
 
 /**
- * Merge multiple compressed audio chunks into a single 16kHz mono WAV
- * This is CRITICAL: concatenating compressed audio (webm/mp4/ogg) creates invalid containers
- * Instead, decode each chunk independently, then merge the PCM data
+ * DEPRECATED: This function fails on WebM/Opus chunks due to decodeAudioData limitations
+ * in Safari and when chunking breaks the WebM container structure.
+ * 
+ * Use simple Blob concatenation instead for real-time transcription (WebM/Opus is valid for Whisper).
+ * 
+ * Legacy function: Merge multiple compressed audio chunks into a single 16kHz mono WAV.
+ * Kept for reference but no longer used in the main transcription pipeline.
  */
 export async function mergeChunksToWav(chunks: Blob[]): Promise<Blob> {
   if (chunks.length === 0) {

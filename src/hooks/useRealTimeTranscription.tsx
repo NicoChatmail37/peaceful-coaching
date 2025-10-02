@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { transcribeAudio, mergeChunksToWav, type WhisperModel } from "@/lib/whisperService";
+import { transcribeAudio, type WhisperModel } from "@/lib/whisperService";
 import { generateSummary } from "@/lib/llmService";
 import { storeAudioBlob, storeTranscriptResult } from "@/lib/transcriptionStorage";
 import { toast } from "@/hooks/use-toast";
@@ -262,36 +262,35 @@ export const useRealTimeTranscription = ({
       
       // FORCED FLUSH: If buffer reaches 3 chunks (~9 seconds of continuous speech), flush it
       if (vadBufferRef.current.length >= 3) {
-        console.log('⚡ Forced flush (buffer full): merging', vadBufferRef.current.length, 'chunks to WAV');
-        try {
-          const mergedWav = await mergeChunksToWav(vadBufferRef.current);
-          vadBufferRef.current = [];
-          queueRef.current.push(mergedWav);
-          pump();
-        } catch (err) {
-          console.error('❌ Failed to merge chunks:', err);
-          vadBufferRef.current = []; // Clear buffer to prevent stuck state
-        }
+        console.log('⚡ Forced flush (buffer full): concatenating', vadBufferRef.current.length, 'chunks');
+        
+        // Simple Blob concatenation (no conversion) - WebM/Opus is valid for Whisper
+        const concatenated = new Blob(vadBufferRef.current, { 
+          type: vadBufferRef.current[0].type || 'audio/webm' 
+        });
+        
+        vadBufferRef.current = [];
+        queueRef.current.push(concatenated);
+        pump();
       }
     } else {
       const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
       
       // If we have buffered audio and 2.5s of silence, process the buffer
       if (vadBufferRef.current.length > 0 && timeSinceActivity > 2500) {
-        console.log('🔇 Silence detected after activity, merging buffer to WAV...', {
+        console.log('🔇 Silence detected, concatenating buffer...', {
           bufferSize: vadBufferRef.current.length,
           silenceDuration: timeSinceActivity
         });
         
-        try {
-          const mergedWav = await mergeChunksToWav(vadBufferRef.current);
-          vadBufferRef.current = [];
-          queueRef.current.push(mergedWav);
-          pump();
-        } catch (err) {
-          console.error('❌ Failed to merge chunks:', err);
-          vadBufferRef.current = []; // Clear buffer to prevent stuck state
-        }
+        // Simple Blob concatenation (no conversion) - WebM/Opus is valid for Whisper
+        const concatenated = new Blob(vadBufferRef.current, { 
+          type: vadBufferRef.current[0].type || 'audio/webm' 
+        });
+        
+        vadBufferRef.current = [];
+        queueRef.current.push(concatenated);
+        pump();
       }
     }
   }, [pump]);
@@ -409,14 +408,14 @@ export const useRealTimeTranscription = ({
     // Flush any remaining VAD buffer
     if (vadBufferRef.current.length > 0) {
       console.log('🔄 Flushing pending VAD buffer...', vadBufferRef.current.length, 'chunks');
-      try {
-        const mergedWav = await mergeChunksToWav(vadBufferRef.current);
-        vadBufferRef.current = [];
-        queueRef.current.push(mergedWav);
-      } catch (err) {
-        console.error('❌ Failed to merge chunks during flush:', err);
-        vadBufferRef.current = [];
-      }
+      
+      // Simple Blob concatenation (no conversion) - WebM/Opus is valid for Whisper
+      const concatenated = new Blob(vadBufferRef.current, { 
+        type: vadBufferRef.current[0].type || 'audio/webm' 
+      });
+      
+      vadBufferRef.current = [];
+      queueRef.current.push(concatenated);
     }
 
     // Wait for queue to empty (max 5s)
