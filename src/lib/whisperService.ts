@@ -230,8 +230,9 @@ export async function transcribeAudio(
       task: 'transcribe',
       temperature: 0,
       return_timestamps: true,
-      chunk_length_s: 30,
+      chunk_length_s: 20,      // Adjusted for ~18s concatenated chunks
       stride_length_s: 5,
+      condition_on_previous_text: false, // Prevent looping on own output
     };
     
     // Only include language if specified (allows auto-detection)

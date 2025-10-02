@@ -62,8 +62,8 @@ export class AudioWorkletRecorder {
         // Intelligent stereo downmix to mono
         let monoData: Float32Array;
         if (channelCount === 1) {
-          // Already mono
-          monoData = event.inputBuffer.getChannelData(0);
+          // Already mono - defensive copy
+          monoData = event.inputBuffer.getChannelData(0).slice();
         } else {
           // Stereo → Mono: RMS per buffer to choose dominant channel
           // Prevents HF artifacts from sample-by-sample alternation
@@ -83,8 +83,8 @@ export class AudioWorkletRecorder {
           
           console.log('🎚️ Downmix', { picked: useLeft ? 'L' : 'R', rmsL: Math.sqrt(sumLeft / left.length).toFixed(4), rmsR: Math.sqrt(sumRight / right.length).toFixed(4) });
           
-          monoData = new Float32Array(sourceChannel.length);
-          monoData.set(sourceChannel);
+          // Defensive copy
+          monoData = sourceChannel.slice();
         }
         
         // Store a copy

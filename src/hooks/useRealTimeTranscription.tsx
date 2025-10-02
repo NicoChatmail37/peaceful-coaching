@@ -26,8 +26,18 @@ interface UseRealTimeTranscriptionResult {
 }
 
 /**
+ * Clean repetitive text loops (n-gram deduplication)
+ * Replaces sequences of 3-20 characters repeated 2+ times with just 2 repetitions
+ */
+function dedupeLoops(text: string): string {
+  // Remove repetitions of sequences 3-20 chars repeated ≥3 times
+  return text.replace(/(.{3,20}?)\1{2,}/g, '$1$1');
+}
+
+/**
  * Concatenates multiple WAV blobs into a single valid WAV file
  * Extracts PCM data from each blob and creates a single header
+ * Inserts 100ms silence between chunks to prevent Whisper looping
  */
 async function concatenateWAVBlobs(blobs: Blob[]): Promise<Blob> {
   if (blobs.length === 0) {
@@ -167,9 +177,12 @@ async function concatenateWAVBlobs(blobs: Blob[]): Promise<Blob> {
     }
   }
   
-  // Calculate total data size
-  const totalDataSize = parts.reduce((acc, p) => acc + p.dataSize, 0);
-  console.log('📊 Total PCM data:', totalDataSize, 'bytes');
+  // Calculate total data size + silence padding (100ms = 1600 samples @ 16kHz)
+  const SILENCE_SAMPLES = 1600; // 100ms @ 16kHz
+  const SILENCE_BYTES = SILENCE_SAMPLES * 2; // 16-bit = 2 bytes per sample
+  const silencePadding = (parts.length - 1) * SILENCE_BYTES; // Between chunks only
+  const totalDataSize = parts.reduce((acc, p) => acc + p.dataSize, 0) + silencePadding;
+  console.log('📊 Total PCM data:', totalDataSize, 'bytes (including', silencePadding, 'bytes silence padding)');
   
   // Create output buffer with single header
   const outputSize = 44 + totalDataSize;
@@ -202,11 +215,21 @@ async function concatenateWAVBlobs(blobs: Blob[]): Promise<Blob> {
   writeString(36, 'data');
   view.setUint32(40, totalDataSize, true);
   
-  // Copy PCM data from all parts
+  // Copy PCM data from all parts with silence padding between
   let writeOffset = 44;
-  for (const part of parts) {
+  for (let idx = 0; idx < parts.length; idx++) {
+    const part = parts[idx];
+    
+    // Copy chunk data
     for (let i = 0; i < part.dataSize; i++) {
       view.setUint8(writeOffset++, part.dataView.getUint8(part.dataOffset + i));
+    }
+    
+    // Insert 100ms silence between chunks (not after last)
+    if (idx < parts.length - 1) {
+      for (let i = 0; i < SILENCE_BYTES; i++) {
+        view.setUint8(writeOffset++, 0);
+      }
     }
   }
   
@@ -371,6 +394,16 @@ export const useRealTimeTranscription = ({
       
       // Log raw text before processing (debug)
       console.log('📝 Raw transcription text:', transcriptText);
+      
+      // Apply n-gram deduplication to break loops
+      const cleanedText = dedupeLoops(transcriptText);
+      if (cleanedText !== transcriptText) {
+        console.log('🧹 Cleaned repetitions:', {
+          before: transcriptText.substring(0, 100),
+          after: cleanedText.substring(0, 100)
+        });
+        transcriptText = cleanedText;
+      }
 
       // --- Robust stereo formatting with seg.t0 ---
       if (stereoMode && Array.isArray(result.segments) && result.segments.length) {
