@@ -450,35 +450,56 @@ async function convertToWav(audioBlob: Blob): Promise<Blob> {
 function audioBufferToWav16BitMono(audioBuffer: AudioBuffer): Blob {
   const sampleRate = audioBuffer.sampleRate;
   const numSamples = audioBuffer.length;
-  const buffer = new ArrayBuffer(44 + numSamples * 2); // 16-bit = 2 bytes per sample
+  const bytesPerSample = 2; // 16-bit PCM
+  const blockAlign = 1 * bytesPerSample; // mono * 2 bytes
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = numSamples * bytesPerSample;
+  
+  const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
+  let offset = 0;
   
-  // WAV header for mono 16-bit PCM
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + numSamples * 2, true);
-  writeString(view, 8, 'WAVE');
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true); // PCM
-  view.setUint16(20, 1, true);  // Audio format (PCM)
-  view.setUint16(22, 1, true);  // Mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true); // Byte rate
-  view.setUint16(32, 2, true);  // Block align
-  view.setUint16(34, 16, true); // Bits per sample
-  writeString(view, 36, 'data');
-  view.setUint32(40, numSamples * 2, true);
+  // Helper functions
+  const writeStr = (s: string) => {
+    for (let i = 0; i < s.length; i++) {
+      view.setUint8(offset++, s.charCodeAt(i));
+    }
+  };
+  const writeU32 = (v: number) => { view.setUint32(offset, v, true); offset += 4; };
+  const writeU16 = (v: number) => { view.setUint16(offset, v, true); offset += 2; };
   
-  // Write PCM samples
+  // RIFF header
+  writeStr('RIFF');           // ChunkID
+  writeU32(36 + dataSize);    // ChunkSize
+  writeStr('WAVE');           // Format
+
+  // fmt subchunk
+  writeStr('fmt ');
+  writeU32(16);               // Subchunk1Size (PCM)
+  writeU16(1);                // AudioFormat (1 = PCM)
+  writeU16(1);                // NumChannels (mono)
+  writeU32(sampleRate);       // SampleRate
+  writeU32(byteRate);         // ByteRate
+  writeU16(blockAlign);       // BlockAlign
+  writeU16(16);               // BitsPerSample
+
+  // data subchunk
+  writeStr('data');
+  writeU32(dataSize);
+
+  // PCM samples
   const channelData = audioBuffer.getChannelData(0);
-  let offset = 44;
   for (let i = 0; i < numSamples; i++) {
     const sample = Math.max(-1, Math.min(1, channelData[i]));
-    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-    offset += 2;
+    view.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
   }
-  
-  const wavBlob = new Blob([buffer], { type: 'audio/wav' });
-  console.log('📦 WAV created:', Math.round(wavBlob.size / 1024), 'KB');
+
+  const wavBlob = new Blob([view], { type: 'audio/wav' });
+  console.log('📦 WAV created:', {
+    sizeKB: Math.round(wavBlob.size / 1024),
+    sampleRate,
+    duration: (numSamples / sampleRate).toFixed(2) + 's'
+  });
   return wavBlob;
 }
 

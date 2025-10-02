@@ -204,7 +204,8 @@ export const useRealTimeTranscription = ({
     if (processingRef.current) return;
     processingRef.current = true;
     try {
-      while (isActiveRef.current && queueRef.current.length) {
+      while (queueRef.current.length) {
+        console.log('🔄 Pump running, queue size:', queueRef.current.length);
         const audioBlob = queueRef.current.shift()!;
         await processOne(audioBlob);
       }
@@ -323,11 +324,12 @@ export const useRealTimeTranscription = ({
 
   const stopRealTimeTranscription = useCallback(async () => {
     setIsTranscribing(false);
-    isActiveRef.current = false;
     
     // Flush any pending audio before stopping
     await flushPendingChunk();
     
+    // Now block new chunks
+    isActiveRef.current = false;
     setProgress(0);
 
     toast({
@@ -411,7 +413,7 @@ export const useRealTimeTranscription = ({
       await new Promise(res => setTimeout(res, 50));
     }
     
-    console.log('✅ Flush complete. Queue empty:', queueRef.current.length === 0);
+    console.log('✅ Flush complete. Queue empty:', queueRef.current.length === 0, 'Processing:', processingRef.current);
   }, []);
 
   // Reset state when switching clients/sessions or changing settings
