@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { AudioWorkletRecorder } from '@/lib/audioWorkletRecorder';
 
 export type RecordingState = 'idle' | 'recording' | 'paused' | 'processing';
 
@@ -37,9 +38,8 @@ export function useAudioRecording(): AudioRecordingHook {
     browserOptimal: false
   });
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recorderRef = useRef<AudioWorkletRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
@@ -47,11 +47,9 @@ export function useAudioRecording(): AudioRecordingHook {
   const leftAnalyzerRef = useRef<AnalyserNode | null>(null);
   const rightAnalyzerRef = useRef<AnalyserNode | null>(null);
   const levelIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const onAudioChunkRef = useRef<((blob: Blob) => void) | null>(null);
 
   const isSupported = typeof navigator !== 'undefined' && 
-                     !!navigator.mediaDevices?.getUserMedia &&
-                     !!window.MediaRecorder;
+                     !!navigator.mediaDevices?.getUserMedia;
 
   // Check WebGPU availability
   const checkWebGPU = useCallback(async () => {
@@ -74,7 +72,6 @@ export function useAudioRecording(): AudioRecordingHook {
   }, []);
 
   const startRecording = useCallback(async (enableStereo = false, onAudioChunk?: (blob: Blob) => void) => {
-    onAudioChunkRef.current = onAudioChunk || null;
     if (!isSupported) {
       toast({
         title: "Non supporté",
@@ -107,14 +104,13 @@ export function useAudioRecording(): AudioRecordingHook {
         });
       }
 
-      // Audio constraints with stereo preference (not forced)
+      // Audio constraints (simplified - WAV doesn't need special encoding)
       const audioConstraints: MediaTrackConstraints = enableStereo ? {
         echoCancellation: false,
         autoGainControl: false,
         noiseSuppression: false,
-        channelCount: { ideal: 2, min: 1 }, // Prefer stereo but don't force it
+        channelCount: { ideal: 2, min: 1 },
         sampleRate: { ideal: 48000 },
-        deviceId: undefined // Let browser pick the right device
       } : {
         echoCancellation: true,
         noiseSuppression: true,
@@ -131,7 +127,7 @@ export function useAudioRecording(): AudioRecordingHook {
       const actualChannels = settings.channelCount || 1;
       const isStereo = enableStereo && actualChannels >= 2;
 
-      console.log('Audio track settings:', {
+      console.log('🎙️ Audio track settings:', {
         channelCount: actualChannels,
         sampleRate: settings.sampleRate,
         deviceId: settings.deviceId,
@@ -147,30 +143,25 @@ export function useAudioRecording(): AudioRecordingHook {
       }
 
       streamRef.current = stream;
-      chunksRef.current = [];
 
-      // Setup WebAudio processing chain FIRST (before MediaRecorder)
+      // Setup WebAudio processing chain for visualization
       const audioContext = new AudioContext({ sampleRate: 48000 });
       const source = audioContext.createMediaStreamSource(stream);
       
-      // === WebAudio processing chain ===
-      // 1. Pre-gain: boost weak signals
+      // Audio processing chain (gain + compression)
       const preGain = audioContext.createGain();
-      preGain.gain.value = 2.5; // Boost by 2.5x
+      preGain.gain.value = 2.5;
       
-      // 2. Compressor: prevent clipping
       const compressor = audioContext.createDynamicsCompressor();
-      compressor.threshold.value = -24; // dBFS
+      compressor.threshold.value = -24;
       compressor.knee.value = 6;
       compressor.ratio.value = 3;
       compressor.attack.value = 0.01;
       compressor.release.value = 0.2;
       
-      // 3. Post-gain (makeup gain)
       const postGain = audioContext.createGain();
       postGain.gain.value = 1.2;
       
-      // Connect chain
       source.connect(preGain);
       preGain.connect(compressor);
       compressor.connect(postGain);
@@ -180,17 +171,12 @@ export function useAudioRecording(): AudioRecordingHook {
         compressor: {
           threshold: compressor.threshold.value,
           ratio: compressor.ratio.value,
-          attack: compressor.attack.value,
-          release: compressor.release.value
         },
         postGain: postGain.gain.value
       });
       
-      // === Setup destination for recording the PROCESSED stream ===
-      const destination = audioContext.createMediaStreamDestination();
-      
+      // Create analyzers for visualization
       if (isStereo) {
-        // Stereo analysis + recording setup
         const splitter = audioContext.createChannelSplitter(2);
         const leftAnalyzer = audioContext.createAnalyser();
         const rightAnalyzer = audioContext.createAnalyser();
@@ -199,7 +185,6 @@ export function useAudioRecording(): AudioRecordingHook {
         rightAnalyzer.fftSize = 256;
         
         postGain.connect(splitter);
-        postGain.connect(destination); // Record processed stream
         splitter.connect(leftAnalyzer, 0);
         splitter.connect(rightAnalyzer, 1);
         
@@ -207,127 +192,29 @@ export function useAudioRecording(): AudioRecordingHook {
         leftAnalyzerRef.current = leftAnalyzer;
         rightAnalyzerRef.current = rightAnalyzer;
       } else {
-        // Mono analysis + recording setup
         const analyzer = audioContext.createAnalyser();
         analyzer.fftSize = 256;
         postGain.connect(analyzer);
-        postGain.connect(destination); // Record processed stream
         analyzerRef.current = analyzer;
       }
 
       audioContextRef.current = audioContext;
 
-      // === Setup MediaRecorder on the PROCESSED stream ===
-      const pickMime = () => {
-        // Browser-specific MIME type preferences (based on User Agent)
-        const ua = navigator.userAgent;
-        const isChrome = /Chrome/.test(ua) && /Google Inc/.test(navigator.vendor);
-        const isEdge = /Edg/.test(ua);
-        const isFirefox = /Firefox/.test(ua);
-        const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua);
-        
-        let prefs: string[] = [];
-        
-        if (isChrome || isEdge) {
-          // Chrome/Edge: Prefer Opus in WebM
-          prefs = [
-            "audio/webm;codecs=opus",
-            "audio/webm",
-            "audio/ogg;codecs=opus",
-            "audio/mp4;codecs=mp4a.40.2",
-          ];
-        } else if (isFirefox) {
-          // Firefox: Prefer Opus in Ogg
-          prefs = [
-            "audio/ogg;codecs=opus",
-            "audio/webm;codecs=opus",
-            "audio/webm",
-          ];
-        } else if (isSafari) {
-          // Safari: Prefer AAC in MP4
-          prefs = [
-            "audio/mp4;codecs=mp4a.40.2",
-            "audio/mp4",
-            "audio/webm;codecs=opus",
-          ];
-        } else {
-          // Generic fallback
-          prefs = [
-            "audio/webm;codecs=opus",
-            "audio/webm",
-            "audio/ogg;codecs=opus",
-            "audio/mp4;codecs=mp4a.40.2",
-          ];
-        }
-        
-        console.log('🌐 Browser detected:', { isChrome, isEdge, isFirefox, isSafari });
-        
-        for (const t of prefs) {
-          if (MediaRecorder.isTypeSupported(t)) {
-            console.log('✅ Selected MIME type:', t);
-            return t;
-          }
-        }
-        
-        console.log('⚠️ Using browser default MIME type');
-        return ""; // let browser choose
-      };
-
-      const mimeType = pickMime();
-
-      // Record the PROCESSED stream, not the original
-      const mediaRecorder = new MediaRecorder(destination.stream, {
-        mimeType: mimeType || undefined,
-        audioBitsPerSecond: 128000,
-      });
-      
-      // Log the effective MIME type used by the MediaRecorder
-      console.log('📼 MediaRecorder initialized:', {
-        requestedMime: mimeType || '(browser default)',
-        effectiveMime: mediaRecorder.mimeType,
-        stereo: isStereo,
-        channels: actualChannels
+      // Create and start AudioWorkletRecorder (records original stream as WAV)
+      recorderRef.current = new AudioWorkletRecorder({
+        sampleRate: 16000, // Whisper optimal rate
+        onDataAvailable: onAudioChunk, // Real-time chunks callback
+        onError: (error) => {
+          console.error('❌ AudioWorkletRecorder error:', error);
+          toast({
+            title: "Erreur d'enregistrement",
+            description: error.message,
+            variant: "destructive"
+          });
+        },
       });
 
-      mediaRecorder.onerror = (e) => {
-        console.error('MediaRecorder error:', e);
-        toast({
-          title: "Erreur d'enregistrement",
-          description: "Le flux a rencontré une erreur.",
-          variant: "destructive"
-        });
-      };
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          const chunkInfo = {
-            size: event.data.size,
-            type: event.data.type,
-            sizeKB: Math.round(event.data.size / 1024),
-            stereo: isStereo,
-            channels: actualChannels
-          };
-          console.log('📼 Audio chunk received:', chunkInfo);
-          
-          chunksRef.current.push(event.data);
-          // Call real-time transcription callback if provided
-          if (onAudioChunkRef.current && event.data.size > 0) {
-            onAudioChunkRef.current(event.data);
-          }
-        }
-      };
-
-      mediaRecorder.start(3000); // Record in 3-second chunks for better real-time processing
-      
-      // Watchdog: force data emission periodically
-      const requestDataTimer = setInterval(() => {
-        try { mediaRecorder.requestData(); } catch {}
-      }, 5000);
-      
-      // Store timer reference for cleanup
-      (mediaRecorder as any)._requestDataTimer = requestDataTimer;
-      
-      mediaRecorderRef.current = mediaRecorder;
+      await recorderRef.current.start(stream);
 
       // Update stereo info
       setStereoInfo({
@@ -348,7 +235,6 @@ export function useAudioRecording(): AudioRecordingHook {
       // Start audio level monitoring
       levelIntervalRef.current = setInterval(() => {
         if (isStereo && leftAnalyzerRef.current && rightAnalyzerRef.current) {
-          // Stereo level monitoring
           const leftData = new Uint8Array(leftAnalyzerRef.current.frequencyBinCount);
           const rightData = new Uint8Array(rightAnalyzerRef.current.frequencyBinCount);
           
@@ -361,7 +247,6 @@ export function useAudioRecording(): AudioRecordingHook {
           setStereoInfo(prev => ({ ...prev, leftLevel, rightLevel }));
           setAudioLevel(Math.max(leftLevel, rightLevel));
         } else if (analyzerRef.current) {
-          // Mono level monitoring
           const dataArray = new Uint8Array(analyzerRef.current.frequencyBinCount);
           analyzerRef.current.getByteFrequencyData(dataArray);
           const level = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length / 255;
@@ -372,8 +257,8 @@ export function useAudioRecording(): AudioRecordingHook {
       setState('recording');
       
       toast({
-        title: enableStereo ? "Enregistrement stéréo démarré" : "Enregistrement démarré",
-        description: `Enregistrement ${isStereo ? 'stéréo' : 'mono'} en cours • Enregistrement local uniquement`,
+        title: "Enregistrement WAV démarré",
+        description: `Format: WAV PCM16 16kHz mono • ${isStereo ? 'Source stéréo' : 'Source mono'}`,
         variant: "default"
       });
 
@@ -388,8 +273,8 @@ export function useAudioRecording(): AudioRecordingHook {
   }, [isSupported, checkWebGPU, checkBrowserOptimal]);
 
   const pauseRecording = useCallback(() => {
-    if (mediaRecorderRef.current && state === 'recording') {
-      mediaRecorderRef.current.pause();
+    if (recorderRef.current && state === 'recording') {
+      recorderRef.current.pause();
       setState('paused');
       
       if (durationIntervalRef.current) {
@@ -403,8 +288,8 @@ export function useAudioRecording(): AudioRecordingHook {
   }, [state]);
 
   const resumeRecording = useCallback(() => {
-    if (mediaRecorderRef.current && state === 'paused') {
-      mediaRecorderRef.current.resume();
+    if (recorderRef.current && state === 'paused') {
+      recorderRef.current.resume();
       setState('recording');
 
       // Resume duration counter
@@ -426,57 +311,52 @@ export function useAudioRecording(): AudioRecordingHook {
     }
   }, [state, duration]);
 
-  const stopRecording = useCallback((): Promise<Blob | null> => {
-    return new Promise((resolve) => {
-      if (!mediaRecorderRef.current) {
-        resolve(null);
-        return;
+  const stopRecording = useCallback(async (): Promise<Blob | null> => {
+    if (!recorderRef.current) {
+      return null;
+    }
+
+    setState('processing');
+
+    try {
+      const wavBlob = await recorderRef.current.stop();
+      
+      // Cleanup
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      if (levelIntervalRef.current) {
+        clearInterval(levelIntervalRef.current);
+        levelIntervalRef.current = null;
       }
 
-      setState('processing');
+      setState('idle');
+      setDuration(0);
+      setAudioLevel(0);
+      recorderRef.current = null;
+      analyzerRef.current = null;
 
-      const requestDataTimer = (mediaRecorderRef.current as any)._requestDataTimer;
+      toast({
+        title: "Enregistrement WAV terminé",
+        description: `${Math.round(wavBlob.size / 1024)} Ko • Format: ${wavBlob.type}`,
+        variant: "default"
+      });
 
-      mediaRecorderRef.current.onstop = () => {
-        const finalType = mediaRecorderRef.current?.mimeType || 'audio/webm';
-        const blob = new Blob(chunksRef.current, { type: finalType });
-        
-        // Cleanup
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-        if (audioContextRef.current) {
-          audioContextRef.current.close();
-          audioContextRef.current = null;
-        }
-        if (durationIntervalRef.current) {
-          clearInterval(durationIntervalRef.current);
-        }
-        if (levelIntervalRef.current) {
-          clearInterval(levelIntervalRef.current);
-        }
-        if (requestDataTimer) {
-          clearInterval(requestDataTimer);
-        }
-
-        setState('idle');
-        setDuration(0);
-        setAudioLevel(0);
-        chunksRef.current = [];
-        mediaRecorderRef.current = null;
-        analyzerRef.current = null;
-
-        toast({
-          title: "Enregistrement terminé",
-          description: `Audio enregistré (${Math.round(blob.size / 1024)} Ko, type: ${finalType})`
-        });
-
-        resolve(blob);
-      };
-
-      mediaRecorderRef.current.stop();
-    });
+      return wavBlob;
+    } catch (error) {
+      console.error('Error stopping recording:', error);
+      setState('idle');
+      return null;
+    }
   }, []);
 
   return {
