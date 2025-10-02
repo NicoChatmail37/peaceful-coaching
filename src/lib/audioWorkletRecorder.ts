@@ -5,7 +5,9 @@
 
 export interface AudioWorkletRecorderOptions {
   sampleRate?: number; // Target sample rate (default: 16000 for Whisper)
-  onDataAvailable?: (blob: Blob) => void;
+  timesliceMs?: number; // Emit chunks every N milliseconds (default: 3000)
+  onChunk?: (blob: Blob) => void; // Called for each chunk during recording
+  onDataAvailable?: (blob: Blob) => void; // Called at stop with final chunk
   onError?: (error: Error) => void;
 }
 
@@ -17,23 +19,33 @@ export class AudioWorkletRecorder {
   private recordedChunks: Float32Array[] = [];
   private isRecording = false;
   private targetSampleRate: number;
+  private timesliceMs: number;
+  private onChunk?: (blob: Blob) => void;
   private onDataAvailable?: (blob: Blob) => void;
   private onError?: (error: Error) => void;
+  private accumulatedSamples = 0;
+  private sliceSamples: number;
+  private nativeSampleRate = 48000;
 
   constructor(options: AudioWorkletRecorderOptions = {}) {
     this.targetSampleRate = options.sampleRate || 16000;
+    this.timesliceMs = options.timesliceMs || 3000;
+    this.onChunk = options.onChunk;
     this.onDataAvailable = options.onDataAvailable;
     this.onError = options.onError;
+    this.sliceSamples = Math.floor(this.targetSampleRate * (this.timesliceMs / 1000));
   }
 
   async start(stream: MediaStream): Promise<void> {
     try {
       this.stream = stream;
       this.recordedChunks = [];
+      this.accumulatedSamples = 0;
       this.isRecording = true;
 
       // Create AudioContext with native sample rate (will downsample later)
       this.audioContext = new AudioContext();
+      this.nativeSampleRate = this.audioContext.sampleRate;
       this.sourceNode = this.audioContext.createMediaStreamSource(stream);
 
       // Use ScriptProcessorNode (deprecated but more compatible than AudioWorklet)
@@ -46,20 +58,66 @@ export class AudioWorkletRecorder {
         const inputData = event.inputBuffer.getChannelData(0);
         // Store a copy
         this.recordedChunks.push(new Float32Array(inputData));
+        this.accumulatedSamples += inputData.length;
+
+        // Check if we have enough samples for a chunk (in native sample rate)
+        const nativeSliceSamples = Math.floor(this.nativeSampleRate * (this.timesliceMs / 1000));
+        
+        if (this.accumulatedSamples >= nativeSliceSamples) {
+          this.emitChunk();
+        }
       };
 
       this.sourceNode.connect(this.processorNode);
       this.processorNode.connect(this.audioContext.destination);
 
-      console.log('🎙️ AudioWorkletRecorder started', {
+      console.log('🎙️ AudioWorkletRecorder started (streaming mode)', {
         nativeSampleRate: this.audioContext.sampleRate,
         targetSampleRate: this.targetSampleRate,
+        timesliceMs: this.timesliceMs,
+        sliceSamples: this.sliceSamples,
       });
     } catch (error) {
       console.error('❌ AudioWorkletRecorder start error:', error);
       this.onError?.(error as Error);
       throw error;
     }
+  }
+
+  private emitChunk(): void {
+    if (this.recordedChunks.length === 0) return;
+
+    // Merge accumulated chunks
+    const totalLength = this.recordedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const mergedAudio = new Float32Array(totalLength);
+    let offset = 0;
+    for (const chunk of this.recordedChunks) {
+      mergedAudio.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    // Downsample if necessary
+    const downsampledAudio =
+      this.nativeSampleRate !== this.targetSampleRate
+        ? this.downsample(mergedAudio, this.nativeSampleRate, this.targetSampleRate)
+        : mergedAudio;
+
+    // Encode to WAV
+    const wavBlob = this.encodeWAV(downsampledAudio, this.targetSampleRate);
+
+    console.log('📼 AW chunk emitted', {
+      type: wavBlob.type,
+      size: wavBlob.size,
+      sizeKB: Math.round(wavBlob.size / 1024),
+      durationSec: downsampledAudio.length / this.targetSampleRate,
+    });
+
+    // Emit chunk
+    this.onChunk?.(wavBlob);
+
+    // Reset buffer
+    this.recordedChunks = [];
+    this.accumulatedSamples = 0;
   }
 
   pause(): void {
@@ -75,6 +133,12 @@ export class AudioWorkletRecorder {
   async stop(): Promise<Blob> {
     this.isRecording = false;
 
+    // Emit any remaining buffered audio as final chunk
+    if (this.recordedChunks.length > 0) {
+      console.log('🔄 Emitting final chunk on stop...');
+      this.emitChunk();
+    }
+
     // Disconnect nodes
     if (this.sourceNode) {
       this.sourceNode.disconnect();
@@ -86,45 +150,18 @@ export class AudioWorkletRecorder {
     }
 
     // Close audio context
-    const nativeSampleRate = this.audioContext?.sampleRate || 48000;
     if (this.audioContext) {
       await this.audioContext.close();
       this.audioContext = null;
     }
 
-    console.log('🛑 AudioWorkletRecorder stopped', {
-      chunks: this.recordedChunks.length,
-      totalSamples: this.recordedChunks.reduce((sum, chunk) => sum + chunk.length, 0),
-    });
+    console.log('🛑 AudioWorkletRecorder stopped (streaming mode)');
 
-    // Merge all chunks
-    const totalLength = this.recordedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const mergedAudio = new Float32Array(totalLength);
-    let offset = 0;
-    for (const chunk of this.recordedChunks) {
-      mergedAudio.set(chunk, offset);
-      offset += chunk.length;
-    }
+    // Return empty blob (real data was sent via onChunk)
+    const emptyBlob = new Blob([], { type: 'audio/wav' });
+    this.onDataAvailable?.(emptyBlob);
 
-    // Downsample if necessary
-    const downsampledAudio =
-      nativeSampleRate !== this.targetSampleRate
-        ? this.downsample(mergedAudio, nativeSampleRate, this.targetSampleRate)
-        : mergedAudio;
-
-    // Encode to WAV
-    const wavBlob = this.encodeWAV(downsampledAudio, this.targetSampleRate);
-
-    console.log('✅ WAV encoded', {
-      size: wavBlob.size,
-      type: wavBlob.type,
-      sampleRate: this.targetSampleRate,
-    });
-
-    this.onDataAvailable?.(wavBlob);
-    this.recordedChunks = [];
-
-    return wavBlob;
+    return emptyBlob;
   }
 
   /**
