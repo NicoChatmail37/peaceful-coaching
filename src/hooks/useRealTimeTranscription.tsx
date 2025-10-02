@@ -25,6 +25,203 @@ interface UseRealTimeTranscriptionResult {
   flushPendingChunk: () => Promise<void>;
 }
 
+/**
+ * Concatenates multiple WAV blobs into a single valid WAV file
+ * Extracts PCM data from each blob and creates a single header
+ */
+async function concatenateWAVBlobs(blobs: Blob[]): Promise<Blob> {
+  if (blobs.length === 0) {
+    throw new Error('No blobs to concatenate');
+  }
+  
+  if (blobs.length === 1) {
+    return blobs[0]; // No concatenation needed
+  }
+
+  console.log('🔗 Concatenating', blobs.length, 'WAV chunks...');
+
+  // Read all buffers
+  const buffers = await Promise.all(blobs.map(b => b.arrayBuffer()));
+
+  interface WavPart {
+    dataView: DataView;
+    dataOffset: number;
+    dataSize: number;
+    sampleRate: number;
+    numChannels: number;
+    bitsPerSample: number;
+  }
+
+  const parts: WavPart[] = [];
+  
+  for (const buf of buffers) {
+    const dv = new DataView(buf);
+    
+    // Check RIFF header
+    const riff = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
+    if (riff !== 'RIFF') {
+      console.error('❌ Invalid WAV: missing RIFF header');
+      throw new Error('Invalid WAV file: missing RIFF header');
+    }
+    
+    // Check WAVE format
+    const wave = String.fromCharCode(dv.getUint8(8), dv.getUint8(9), dv.getUint8(10), dv.getUint8(11));
+    if (wave !== 'WAVE') {
+      console.error('❌ Invalid WAV: missing WAVE format');
+      throw new Error('Invalid WAV file: missing WAVE format');
+    }
+    
+    // Find fmt chunk
+    let offset = 12;
+    let fmtFound = false;
+    let sampleRate = 0, numChannels = 0, bitsPerSample = 0, audioFormat = 0;
+    
+    while (offset < dv.byteLength - 8) {
+      const chunkId = String.fromCharCode(
+        dv.getUint8(offset), dv.getUint8(offset + 1),
+        dv.getUint8(offset + 2), dv.getUint8(offset + 3)
+      );
+      const chunkSize = dv.getUint32(offset + 4, true);
+      
+      if (chunkId === 'fmt ') {
+        fmtFound = true;
+        audioFormat = dv.getUint16(offset + 8, true);
+        numChannels = dv.getUint16(offset + 10, true);
+        sampleRate = dv.getUint32(offset + 12, true);
+        bitsPerSample = dv.getUint16(offset + 22, true);
+        
+        // Verify PCM format
+        if (audioFormat !== 1) {
+          console.error('❌ Not PCM format:', audioFormat);
+          throw new Error(`WAV must be PCM format (got ${audioFormat})`);
+        }
+        
+        // Verify 16kHz mono 16-bit
+        if (sampleRate !== 16000) {
+          console.warn('⚠️ Sample rate not 16kHz:', sampleRate);
+        }
+        if (numChannels !== 1) {
+          console.warn('⚠️ Not mono:', numChannels, 'channels');
+        }
+        if (bitsPerSample !== 16) {
+          console.warn('⚠️ Not 16-bit:', bitsPerSample);
+        }
+        
+        offset += 8 + chunkSize;
+        break;
+      }
+      
+      offset += 8 + chunkSize;
+    }
+    
+    if (!fmtFound) {
+      console.error('❌ fmt chunk not found');
+      throw new Error('WAV fmt chunk not found');
+    }
+    
+    // Find data chunk
+    let dataOffset = 0;
+    let dataSize = 0;
+    let dataFound = false;
+    
+    while (offset < dv.byteLength - 8) {
+      const chunkId = String.fromCharCode(
+        dv.getUint8(offset), dv.getUint8(offset + 1),
+        dv.getUint8(offset + 2), dv.getUint8(offset + 3)
+      );
+      const chunkSize = dv.getUint32(offset + 4, true);
+      
+      if (chunkId === 'data') {
+        dataFound = true;
+        dataOffset = offset + 8;
+        dataSize = chunkSize;
+        break;
+      }
+      
+      offset += 8 + chunkSize;
+    }
+    
+    if (!dataFound) {
+      console.error('❌ data chunk not found');
+      throw new Error('WAV data chunk not found');
+    }
+    
+    parts.push({
+      dataView: dv,
+      dataOffset,
+      dataSize,
+      sampleRate,
+      numChannels,
+      bitsPerSample
+    });
+  }
+  
+  // Verify all parts have same format
+  const ref = parts[0];
+  for (let i = 1; i < parts.length; i++) {
+    if (parts[i].sampleRate !== ref.sampleRate ||
+        parts[i].numChannels !== ref.numChannels ||
+        parts[i].bitsPerSample !== ref.bitsPerSample) {
+      console.error('❌ Incompatible WAV formats');
+      throw new Error('All WAV files must have same format');
+    }
+  }
+  
+  // Calculate total data size
+  const totalDataSize = parts.reduce((acc, p) => acc + p.dataSize, 0);
+  console.log('📊 Total PCM data:', totalDataSize, 'bytes');
+  
+  // Create output buffer with single header
+  const outputSize = 44 + totalDataSize;
+  const output = new ArrayBuffer(outputSize);
+  const view = new DataView(output);
+  
+  // Write WAV header
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+  
+  // RIFF chunk descriptor
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + totalDataSize, true); // ChunkSize
+  writeString(8, 'WAVE');
+  
+  // fmt sub-chunk
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true); // Subchunk1Size (PCM)
+  view.setUint16(20, 1, true); // AudioFormat (PCM)
+  view.setUint16(22, ref.numChannels, true);
+  view.setUint32(24, ref.sampleRate, true);
+  view.setUint32(28, ref.sampleRate * ref.numChannels * (ref.bitsPerSample / 8), true); // ByteRate
+  view.setUint16(32, ref.numChannels * (ref.bitsPerSample / 8), true); // BlockAlign
+  view.setUint16(34, ref.bitsPerSample, true);
+  
+  // data sub-chunk
+  writeString(36, 'data');
+  view.setUint32(40, totalDataSize, true);
+  
+  // Copy PCM data from all parts
+  let writeOffset = 44;
+  for (const part of parts) {
+    for (let i = 0; i < part.dataSize; i++) {
+      view.setUint8(writeOffset++, part.dataView.getUint8(part.dataOffset + i));
+    }
+  }
+  
+  console.log('✅ WAV concatenation complete:', {
+    chunks: parts.length,
+    totalSize: outputSize,
+    totalDataSize,
+    sampleRate: ref.sampleRate,
+    channels: ref.numChannels,
+    bits: ref.bitsPerSample
+  });
+  
+  return new Blob([view], { type: 'audio/wav' });
+}
+
 export const useRealTimeTranscription = ({
   sessionId,
   clientId,
@@ -71,7 +268,7 @@ export const useRealTimeTranscription = ({
         size: audioBlob.size,
         type: audioBlob.type,
         sizeKB: Math.round(audioBlob.size / 1024),
-        stereoMode: stereoMode
+        stereoMode: false // Always mono after downmix
       });
 
       // Transcribe the chunk
@@ -283,14 +480,16 @@ export const useRealTimeTranscription = ({
       if (vadBufferRef.current.length >= 3) {
         console.log('⚡ Forced flush (buffer full):', vadBufferRef.current.length, 'chunks');
         
-        // Concat WAV blobs
-        const concatenated = new Blob(vadBufferRef.current, { 
-          type: vadBufferRef.current[0].type || 'audio/wav'
-        });
-        queueRef.current.push(concatenated);
-        
-        vadBufferRef.current = [];
-        pump();
+        // Properly concatenate WAV blobs
+        try {
+          const concatenated = await concatenateWAVBlobs(vadBufferRef.current);
+          queueRef.current.push(concatenated);
+          vadBufferRef.current = [];
+          pump();
+        } catch (error) {
+          console.error('❌ WAV concatenation failed:', error);
+          vadBufferRef.current = [];
+        }
       }
     } else {
       const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
@@ -302,14 +501,16 @@ export const useRealTimeTranscription = ({
           silenceDuration: timeSinceActivity
         });
         
-        // Concat WAV blobs
-        const concatenated = new Blob(vadBufferRef.current, { 
-          type: vadBufferRef.current[0].type || 'audio/wav'
-        });
-        queueRef.current.push(concatenated);
-        
-        vadBufferRef.current = [];
-        pump();
+        // Properly concatenate WAV blobs
+        try {
+          const concatenated = await concatenateWAVBlobs(vadBufferRef.current);
+          queueRef.current.push(concatenated);
+          vadBufferRef.current = [];
+          pump();
+        } catch (error) {
+          console.error('❌ WAV concatenation failed:', error);
+          vadBufferRef.current = [];
+        }
       }
     }
   }, [pump]);
@@ -428,13 +629,15 @@ export const useRealTimeTranscription = ({
     if (vadBufferRef.current.length > 0) {
       console.log('🔄 Flushing pending VAD buffer...', vadBufferRef.current.length, 'chunks');
       
-      // Concat WAV blobs
-      const concatenated = new Blob(vadBufferRef.current, { 
-        type: vadBufferRef.current[0].type || 'audio/wav'
-      });
-      queueRef.current.push(concatenated);
-      
-      vadBufferRef.current = [];
+      // Properly concatenate WAV blobs
+      try {
+        const concatenated = await concatenateWAVBlobs(vadBufferRef.current);
+        queueRef.current.push(concatenated);
+        vadBufferRef.current = [];
+      } catch (error) {
+        console.error('❌ WAV concatenation failed in flush:', error);
+        vadBufferRef.current = [];
+      }
     }
 
     // Wait for queue to empty (max 5s)
