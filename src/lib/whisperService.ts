@@ -189,9 +189,22 @@ export async function transcribeAudio(
 
   // Convert audio to WAV format if needed (Whisper requires WAV/PCM)
   let processedBlob = audioBlob;
-  if (audioBlob.type.includes('webm') || audioBlob.type.includes('ogg') || audioBlob.type.includes('opus')) {
-    console.log('Converting audio from', audioBlob.type, 'to WAV for Whisper...');
-    processedBlob = await convertToWav(audioBlob);
+  const audioType = audioBlob.type.toLowerCase();
+  
+  // Convert ANY non-WAV format to WAV (Safari/macOS uses mp4/m4a, Chrome uses webm, etc.)
+  if (!audioType.includes('wav')) {
+    console.log('🔄 Converting audio from', audioBlob.type, 'to WAV for Whisper...');
+    try {
+      processedBlob = await convertToWav(audioBlob);
+      console.log('✅ Conversion successful:', {
+        originalSize: audioBlob.size,
+        convertedSize: processedBlob.size,
+        originalType: audioBlob.type
+      });
+    } catch (conversionError) {
+      console.error('❌ Audio conversion failed:', conversionError);
+      throw new Error(`Échec de conversion audio: ${conversionError}`);
+    }
   }
 
   const audioUrl = URL.createObjectURL(processedBlob);
@@ -262,16 +275,28 @@ export async function transcribeAudio(
  * This is necessary because Whisper.js requires PCM WAV format
  */
 async function convertToWav(audioBlob: Blob): Promise<Blob> {
+  console.log('🎧 Converting audio:', {
+    inputType: audioBlob.type,
+    inputSizeKB: Math.round(audioBlob.size / 1024)
+  });
+  
   const arrayBuffer = await audioBlob.arrayBuffer();
   const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
   
   try {
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     
+    console.log('🎵 Decoded audio buffer:', {
+      channels: audioBuffer.numberOfChannels,
+      sampleRate: audioBuffer.sampleRate,
+      duration: audioBuffer.duration.toFixed(2) + 's',
+      samples: audioBuffer.length
+    });
+    
     // Convert to WAV with proper PCM encoding
     const wavBlob = audioBufferToWav(audioBuffer);
     
-    console.log('Audio converted:', {
+    console.log('✅ WAV conversion complete:', {
       originalSize: audioBlob.size,
       convertedSize: wavBlob.size,
       channels: audioBuffer.numberOfChannels,
@@ -283,7 +308,12 @@ async function convertToWav(audioBlob: Blob): Promise<Blob> {
     return wavBlob;
   } catch (error) {
     await audioContext.close();
-    throw new Error(`Impossible de décoder l'audio: ${error}`);
+    console.error('❌ Audio decode error:', {
+      error,
+      blobType: audioBlob.type,
+      blobSize: audioBlob.size
+    });
+    throw new Error(`Impossible de décoder l'audio (${audioBlob.type}): ${error}`);
   }
 }
 

@@ -205,6 +205,15 @@ export const useRealTimeTranscription = ({
       lastActivityTimeRef.current = Date.now();
       vadBufferRef.current.push(blob);
       console.log('✅ Activity detected, buffering... (buffer size:', vadBufferRef.current.length, ')');
+      
+      // FORCED FLUSH: If buffer reaches 3 chunks (~9 seconds of continuous speech), flush it
+      if (vadBufferRef.current.length >= 3) {
+        console.log('⚡ Forced flush (buffer full): processing', vadBufferRef.current.length, 'chunks');
+        const mergedBlob = new Blob(vadBufferRef.current, { type: vadBufferRef.current[0].type });
+        vadBufferRef.current = [];
+        queueRef.current.push(mergedBlob);
+        pump();
+      }
     } else {
       const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
       

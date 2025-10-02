@@ -224,10 +224,18 @@ export function useAudioRecording(): AudioRecordingHook {
           "audio/webm",
           "audio/ogg;codecs=opus",
           "audio/ogg",
+          "audio/mp4;codecs=mp4a.40.2", // AAC in MP4 (Safari/macOS)
+          "audio/mp4",                   // Generic MP4
+          "audio/mpeg",                  // MP3
+          "audio/mp3",                   // Alternative MP3
         ];
         for (const t of prefs) {
-          if (MediaRecorder.isTypeSupported(t)) return t;
+          if (MediaRecorder.isTypeSupported(t)) {
+            console.log('🎤 Selected MIME type:', t);
+            return t;
+          }
         }
+        console.log('🎤 Using browser default MIME type');
         return ""; // let browser choose
       };
 
