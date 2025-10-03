@@ -8,21 +8,21 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Upload, CheckCircle, XCircle, Loader2, FileAudio } from 'lucide-react';
 import { 
-  checkBridgeStatus, 
-  transcribeViaBridge, 
-  type BridgeStatusResponse,
-  type BridgeTranscriptionResponse 
-} from '@/lib/whisperBridgeTest';
+  getBridgeStatus, 
+  transcribeBridge, 
+  type BridgeStatus,
+  type WhisperResult
+} from '@/lib/whisperService';
 import { toast } from 'sonner';
 
 export const WhisperBridgeTest = () => {
-  const [bridgeStatus, setBridgeStatus] = useState<BridgeStatusResponse | null>(null);
+  const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptionResult, setTranscriptionResult] = useState<BridgeTranscriptionResponse | null>(null);
+  const [transcriptionResult, setTranscriptionResult] = useState<WhisperResult | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +34,7 @@ export const WhisperBridgeTest = () => {
       setBridgeError(null);
       
       try {
-        const status = await checkBridgeStatus();
+        const status = await getBridgeStatus();
         setBridgeStatus(status);
         toast.success('Bridge connecté avec succès');
       } catch (error) {
@@ -74,7 +74,7 @@ export const WhisperBridgeTest = () => {
     setTranscriptionResult(null);
 
     try {
-      const result = await transcribeViaBridge(selectedFile, 'fr');
+      const result = await transcribeBridge(selectedFile, 'small', 'fr');
       setTranscriptionResult(result);
       toast.success('Transcription terminée');
     } catch (error) {
@@ -226,14 +226,7 @@ export const WhisperBridgeTest = () => {
               
               {/* Text Result */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Texte transcrit:</label>
-                  {transcriptionResult.duration && (
-                    <Badge variant="secondary">
-                      {transcriptionResult.duration.toFixed(1)}s
-                    </Badge>
-                  )}
-                </div>
+                <label className="text-sm font-medium">Texte transcrit:</label>
                 <Textarea
                   value={transcriptionResult.text}
                   readOnly
@@ -253,11 +246,11 @@ export const WhisperBridgeTest = () => {
                         <div key={idx} className="text-sm space-y-1">
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Badge variant="outline" className="font-mono">
-                              {formatTime(segment.start)} → {formatTime(segment.end)}
+                              {formatTime(segment.t0)} → {formatTime(segment.t1)}
                             </Badge>
-                            {segment.confidence !== undefined && (
+                            {segment.conf !== undefined && (
                               <span className="text-xs">
-                                {(segment.confidence * 100).toFixed(0)}%
+                                {(segment.conf * 100).toFixed(0)}%
                               </span>
                             )}
                           </div>
