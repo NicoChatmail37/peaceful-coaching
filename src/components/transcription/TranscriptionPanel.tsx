@@ -103,7 +103,7 @@ export const TranscriptionPanel = ({
 
   useEffect(() => {
     loadSavedTranscripts();
-    checkBridgeStatus();
+    loadBridgeFromEnvironment();
     checkLLMBridgeStatus();
   }, [sessionId]);
 
@@ -113,12 +113,24 @@ export const TranscriptionPanel = ({
     }
   }, [currentTranscript]);
 
-  const checkBridgeStatus = async () => {
+  // Load bridge status from environment probe instead of making direct network calls
+  const loadBridgeFromEnvironment = async () => {
     setCheckingBridge(true);
     try {
-      const status = await getBridgeStatus();
-      setBridgeStatus(status);
+      const { probeEnvironment } = await import('@/lib/envProbe');
+      const env = await probeEnvironment();
+      
+      if (env.bridge.available) {
+        setBridgeStatus({
+          ok: true,
+          device: env.bridge.device || 'cpu',
+          models: []
+        });
+      } else {
+        setBridgeStatus(null);
+      }
     } catch (error) {
+      console.error('Failed to load bridge from environment:', error);
       setBridgeStatus(null);
     } finally {
       setCheckingBridge(false);
@@ -411,7 +423,7 @@ export const TranscriptionPanel = ({
               size="sm"
               variant="ghost"
               onClick={() => {
-                checkBridgeStatus();
+                loadBridgeFromEnvironment();
                 checkLLMBridgeStatus();
               }}
               disabled={checkingBridge}

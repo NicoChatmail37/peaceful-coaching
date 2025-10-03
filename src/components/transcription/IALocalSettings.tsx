@@ -429,6 +429,22 @@ export const IALocalSettings = () => {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                  ) : environment?.bridge.available && environment.bridge.models.includes(model.model) ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="bg-green-600 text-white">
+                        ✅ Disponible via Bridge ({environment.bridge.device?.toUpperCase()})
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const event = new CustomEvent('openBridgeTest');
+                          window.dispatchEvent(event);
+                        }}
+                      >
+                        Ouvrir Bridge Test →
+                      </Button>
+                    </div>
                   ) : model.available && !model.downloading ? (
                     <Button
                       variant="outline"

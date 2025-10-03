@@ -74,15 +74,20 @@ export async function initWhisper(model: WhisperModel = 'tiny', onProgress?: (pr
 }
 
 // Bridge detection and management
+// Use centralized bridge client
+import { pingBridge as pingBridgeClient, transcribeViaBridge } from '@/services/bridgeClient';
+
 export async function pingBridge(): Promise<boolean> {
+  const ac = new AbortController();
+  const timeout = setTimeout(() => ac.abort(), 1500);
+  
   try {
-    const response = await fetch('http://localhost:27123/status', { 
-      mode: 'cors',
-      timeout: 2000 
-    } as RequestInit);
-    return response.ok;
+    await pingBridgeClient(ac.signal);
+    return true;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -93,16 +98,19 @@ export async function getBridgeStatus(): Promise<BridgeStatus | null> {
   }
 
   try {
-    const response = await fetch('http://localhost:27123/status', { 
-      mode: 'cors',
-      timeout: 2000 
-    } as RequestInit);
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 1500);
     
-    if (response.ok) {
-      bridgeStatus = await response.json();
-      lastBridgeCheck = now;
-      return bridgeStatus;
-    }
+    const status = await pingBridgeClient(ac.signal);
+    clearTimeout(timeout);
+    
+    bridgeStatus = {
+      ok: status.ok,
+      device: status.device as 'cpu' | 'metal' | 'cuda',
+      models: [] // Bridge doesn't expose model list in status endpoint
+    };
+    lastBridgeCheck = now;
+    return bridgeStatus;
   } catch (error) {
     console.debug('Bridge not available:', error);
   }
@@ -117,35 +125,23 @@ export async function transcribeBridge(
   model: WhisperModel = 'small', 
   language: string = 'en'
 ): Promise<WhisperResult> {
-  const formData = new FormData();
-  formData.append('file', audioBlob, 'audio.webm');
-  formData.append('model', model);
-  formData.append('language', language);
-
-  const response = await fetch('http://localhost:27123/transcribe', {
-    method: 'POST',
-    mode: 'cors',
-    body: formData
+  const result = await transcribeViaBridge(audioBlob, {
+    task: 'transcribe',
+    language: language === 'en' ? language : (language === 'fr' ? 'fr' : undefined)
   });
-
-  if (!response.ok) {
-    throw new Error(`Bridge transcription failed: ${response.statusText}`);
-  }
-
-  const result = await response.json();
   
   // Convert bridge result to our format
-  const segments: TranscriptSegment[] = result.segments?.map((seg: any) => ({
-    t0: seg.start || seg.t0 || 0,
-    t1: seg.end || seg.t1 || 0,
+  const segments: TranscriptSegment[] = result.segments?.map((seg) => ({
+    t0: seg.start,
+    t1: seg.end,
     text: seg.text.trim(),
-    conf: seg.confidence || seg.conf
+    conf: undefined
   })) || [];
 
   return {
     text: result.text || '',
     segments,
-    srt: result.srt || generateSRT(segments)
+    srt: generateSRT(segments)
   };
 }
 

@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Brain, Mic, Radio } from "lucide-react";
 import { LLMSettings } from "@/components/LLMSettings";
@@ -5,9 +6,21 @@ import { IALocalSettings } from "@/components/transcription/IALocalSettings";
 import { WhisperBridgeTest } from "@/components/transcription/WhisperBridgeTest";
 
 export const TechnicalSettingsView = () => {
+  const [activeTab, setActiveTab] = React.useState("llm");
+
+  // Listen for openBridgeTest event
+  React.useEffect(() => {
+    const handleOpenBridgeTest = () => {
+      setActiveTab("bridge");
+    };
+    
+    window.addEventListener('openBridgeTest', handleOpenBridgeTest);
+    return () => window.removeEventListener('openBridgeTest', handleOpenBridgeTest);
+  }, []);
+
   return (
     <div className="flex-1">
-      <Tabs defaultValue="llm" className="h-full flex flex-col">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
         <TabsList className="grid w-full grid-cols-3 rounded-none border-b border-border h-12 bg-muted/30">
           <TabsTrigger value="llm" className="flex items-center gap-2">
             <Brain className="h-4 w-4" />

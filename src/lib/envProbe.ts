@@ -1,4 +1,4 @@
-import { getBridgeStatus, checkModelAvailability, type WhisperModel } from '@/lib/whisperService';
+import { checkModelAvailability, type WhisperModel } from '@/lib/whisperService';
 
 export interface DeviceInfo {
   class: 'mobile' | 'laptop' | 'desktop';
@@ -151,14 +151,38 @@ export function getNetworkInfo() {
  */
 export async function detectBridge(): Promise<BridgeInfo> {
   try {
-    const status = await getBridgeStatus();
+    // Check if user has enabled bridge in preferences
+    const { getTranscriptionDB } = await import('./transcriptionStorage');
+    const db = await getTranscriptionDB();
+    const useBridgePref = await db.get('prefs', 'useBridge');
     
-    if (status?.ok) {
+    // If user hasn't enabled bridge, skip network ping
+    if (useBridgePref?.value === false) {
       return {
-        available: true,
-        models: status.models?.map(m => m.name) || [],
-        device: status.device
+        available: false,
+        models: []
       };
+    }
+    
+    // Ping bridge with timeout
+    const { pingBridge } = await import('@/services/bridgeClient');
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 1500);
+    
+    try {
+      const status = await pingBridge(ac.signal);
+      clearTimeout(timeout);
+      
+      if (status?.ok) {
+        return {
+          available: true,
+          models: ['small', 'medium'], // Bridge typically supports these
+          device: status.device as 'cpu' | 'metal' | 'cuda'
+        };
+      }
+    } catch (pingError) {
+      clearTimeout(timeout);
+      console.debug('Bridge ping failed:', pingError);
     }
   } catch (error) {
     console.debug('Bridge detection failed:', error);

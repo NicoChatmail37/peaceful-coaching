@@ -19,6 +19,7 @@ export const WhisperBridgeTest = () => {
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [task, setTask] = useState<"transcribe" | "translate">("transcribe");
@@ -29,8 +30,42 @@ export const WhisperBridgeTest = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Load useBridge preference on mount
+  useEffect(() => {
+    const loadPreference = async () => {
+      try {
+        const { getTranscriptionDB } = await import('@/lib/transcriptionStorage');
+        const db = await getTranscriptionDB();
+        const pref = await db.get('prefs', 'useBridge');
+        setUseBridge(pref?.value !== false); // Default to true
+      } catch (error) {
+        console.error('Failed to load useBridge preference:', error);
+      } finally {
+        setPreferencesLoaded(true);
+      }
+    };
+    loadPreference();
+  }, []);
+
+  // Save useBridge preference and dispatch event when changed
+  const handleUseBridgeChange = async (checked: boolean) => {
+    setUseBridge(checked);
+    
+    try {
+      const { getTranscriptionDB } = await import('@/lib/transcriptionStorage');
+      const db = await getTranscriptionDB();
+      await db.put('prefs', { key: 'useBridge', value: checked });
+      
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('bridgePreferenceChanged', { detail: { useBridge: checked } }));
+    } catch (error) {
+      console.error('Failed to save useBridge preference:', error);
+    }
+  };
+
   // Check bridge status when enabled
   useEffect(() => {
+    if (!preferencesLoaded) return;
     if (!useBridge) {
       setBridgeStatus(null);
       setBridgeError(null);
@@ -129,10 +164,11 @@ export const WhisperBridgeTest = () => {
             <Switch
               id="use-bridge"
               checked={useBridge}
-              onCheckedChange={setUseBridge}
+              onCheckedChange={handleUseBridgeChange}
+              disabled={!preferencesLoaded}
             />
             <Label htmlFor="use-bridge">
-              Utiliser le bridge local (http://127.0.0.1:27123)
+              Utiliser le bridge local ({BRIDGE_URL})
             </Label>
           </div>
 
