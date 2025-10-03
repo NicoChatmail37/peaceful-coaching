@@ -181,7 +181,7 @@ export const AudioRecorder = ({ onAudioReady, disabled = false }: AudioRecorderP
           <div className="flex gap-2">
             {state === 'idle' && (
               <Button 
-                onClick={() => startRecording(enableStereo)} 
+                onClick={() => startRecording({ enableStereo })} 
                 disabled={disabled}
                 size="sm"
                 className="flex items-center gap-2"

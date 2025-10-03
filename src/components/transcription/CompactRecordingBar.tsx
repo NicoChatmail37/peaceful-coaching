@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import { useAudioRecording } from "@/hooks/useAudioRecording";
 import { useRealTimeTranscription } from "@/hooks/useRealTimeTranscription";
+import { useAudioChunks } from "@/hooks/useAudioChunks";
 import { toast } from "@/hooks/use-toast";
+import type { RecordingMode } from "@/lib/audioWorkletRecorder";
 import {
   Select,
   SelectContent,
@@ -43,6 +45,7 @@ export const CompactRecordingBar = ({
   const [enableStereo, setEnableStereo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedModel, setSelectedModel] = useState<WhisperModel>('tiny');
+  const [recordingMode, setRecordingMode] = useState<RecordingMode>('auto-60s');
   const [vadActivity, setVadActivity] = useState<{ active: boolean; threshold: number; level: number }>({
     active: false,
     threshold: 0.02,
