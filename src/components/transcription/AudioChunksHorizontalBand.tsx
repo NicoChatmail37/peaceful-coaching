@@ -33,7 +33,7 @@ interface AudioChunksHorizontalBandProps {
 export const AudioChunksHorizontalBand = ({
   sessionId,
   clientId,
-  whisperModel = 'base',
+  whisperModel = 'small', // PATCH 2: Use 'small' instead of 'base' to ensure bridge is used
   enableStereo = false,
   onChunkTranscribed,
 }: AudioChunksHorizontalBandProps) => {

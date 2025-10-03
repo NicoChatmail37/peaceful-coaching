@@ -77,6 +77,9 @@ export async function initWhisper(model: WhisperModel = 'tiny', onProgress?: (pr
 // Use centralized bridge client
 import { pingBridge as pingBridgeClient, transcribeViaBridge } from '@/services/bridgeClient';
 
+// PATCH 3: Gate for stereo split (keep OFF until stereo PCM16 WAV is ready)
+const USE_STEREO_SPLIT = false; // Set to true when recording stereo WAV PCM16
+
 export async function pingBridge(): Promise<boolean> {
   const ac = new AbortController();
   const timeout = setTimeout(() => ac.abort(), 1500);
@@ -163,8 +166,8 @@ export async function transcribeAudio(
     useBridge = true;
   } else if (mode === 'auto') {
     const bridgeAvailable = await pingBridge();
-    // Use bridge for larger models or if specifically available
-    useBridge = bridgeAvailable && (model === 'small' || model === 'medium');
+    // PATCH 1: Always use bridge if available (no model restriction)
+    useBridge = bridgeAvailable;
   }
 
   // Try bridge first if desired

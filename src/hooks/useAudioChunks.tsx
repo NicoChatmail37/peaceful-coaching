@@ -93,9 +93,11 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
         }
 
         console.log('🎤 Transcribing chunk:', chunkId);
+        // PATCH 2: Force bridge mode for better quality
         const result = await transcribeAudio(chunk.blob, { 
           model: modelId,
-          language: undefined // Auto-detect language
+          language: 'fr',
+          mode: 'bridge'
         });
 
         if (!result.text || result.text.trim() === '') {
