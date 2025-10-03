@@ -147,6 +147,7 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
         <CompactRecordingBar
           sessionId={sessionId}
           clientId={clientId}
+          clientName="Client"
           onTranscriptUpdate={(text) => {
             setTranscriptText(prev => prev + (prev ? '\n' : '') + text);
           }}

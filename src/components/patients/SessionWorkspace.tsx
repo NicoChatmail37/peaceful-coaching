@@ -153,6 +153,7 @@ export const SessionWorkspace = ({
         <CompactRecordingBar
           sessionId={session.id}
           clientId={patient.id}
+          clientName={patient.name}
           onTranscriptUpdate={(fullText) => {
             setTranscriptText(fullText);
           }}
