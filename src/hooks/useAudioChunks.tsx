@@ -91,7 +91,10 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
         }
 
         console.log('🎤 Transcribing chunk:', chunkId);
-        const result = await transcribeAudio(chunk.blob, { model: modelId });
+        const result = await transcribeAudio(chunk.blob, { 
+          model: modelId,
+          language: undefined // Auto-detect language
+        });
 
         if (!result.text || result.text.trim() === '') {
           throw new Error('Transcription vide');

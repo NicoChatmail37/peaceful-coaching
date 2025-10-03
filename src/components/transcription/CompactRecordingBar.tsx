@@ -30,6 +30,9 @@ import {
   Sheet,
   SheetContent,
   SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import { getModelInfo, type WhisperModel } from "@/lib/whisperService";
 import { AudioChunksPanel } from "@/components/transcription/AudioChunksPanel";
@@ -420,6 +423,12 @@ export const CompactRecordingBar = ({
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Morceaux audio - {clientName}</SheetTitle>
+                <SheetDescription>
+                  Gérez et transcrivez vos enregistrements audio par morceaux
+                </SheetDescription>
+              </SheetHeader>
               <AudioChunksPanel 
                 sessionId={sessionId} 
                 clientId={clientId}

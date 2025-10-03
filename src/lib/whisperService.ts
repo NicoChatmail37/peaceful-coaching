@@ -159,7 +159,7 @@ export async function transcribeAudio(
     sizeKB: Math.round(audioBlob.size / 1024)
   });
   
-  const { model = 'tiny', language = 'en', mode = 'auto', onProgress } = options;
+  const { model = 'tiny', language, mode = 'auto', onProgress } = options;
 
   // Determine transcription method
   let useBridge = false;
