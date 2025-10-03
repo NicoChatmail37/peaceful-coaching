@@ -64,6 +64,34 @@ export async function getCachedModels(): Promise<CachedModels> {
 }
 
 /**
+ * Get preferred Whisper model from IndexedDB
+ */
+export async function getPreferredWhisperModel(): Promise<string> {
+  try {
+    const { getTranscriptionDB } = await import('./transcriptionStorage');
+    const db = await getTranscriptionDB();
+    const pref = await db.get('prefs', 'preferredWhisperModel');
+    return pref?.value || 'tiny';
+  } catch {
+    return 'tiny';
+  }
+}
+
+/**
+ * Set preferred Whisper model in IndexedDB
+ */
+export async function setPreferredWhisperModel(model: string): Promise<void> {
+  try {
+    const { getTranscriptionDB } = await import('./transcriptionStorage');
+    const db = await getTranscriptionDB();
+    await db.put('prefs', { key: 'preferredWhisperModel', value: model });
+    window.dispatchEvent(new CustomEvent('preferredModelChanged', { detail: { model } }));
+  } catch (error) {
+    console.error('Failed to save preferred model:', error);
+  }
+}
+
+/**
  * Détecte l'état d'alimentation (batterie vs secteur)
  */
 export async function getPowerState(): Promise<'battery' | 'ac' | 'unknown'> {

@@ -11,8 +11,9 @@ import {
   Wand2,
   Settings,
   FileText,
-  CheckCircle,
-  Package
+  Package,
+  Target,
+  Globe
 } from "lucide-react";
 import { useAudioRecording } from "@/hooks/useAudioRecording";
 import { useRealTimeTranscription } from "@/hooks/useRealTimeTranscription";
@@ -57,18 +58,14 @@ export const CompactRecordingBar = ({
   const [enableStereo, setEnableStereo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedModel, setSelectedModel] = useState<WhisperModel>('tiny');
+  const [modelSource, setModelSource] = useState<'browser' | 'bridge'>('browser');
+  const [bridgeDevice, setBridgeDevice] = useState<string>('');
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('auto-60s');
   const [showChunksPanel, setShowChunksPanel] = useState(false);
   const [vadActivity, setVadActivity] = useState<{ active: boolean; threshold: number; level: number }>({
     active: false,
     threshold: 0.02,
     level: 0
-  });
-  const [modelCachedStatus, setModelCachedStatus] = useState<Record<WhisperModel, boolean>>({
-    'tiny': false,
-    'base': false,
-    'small': false,
-    'medium': false,
   });
 
   const {
@@ -112,49 +109,41 @@ export const CompactRecordingBar = ({
     autoRefresh: true 
   });
 
-  // Check model cached status on mount and sync with settings
+  // Load preferred model from settings on mount
   useEffect(() => {
-    const checkModelStatus = async () => {
-      const { checkModelAvailability } = await import('@/lib/whisperService');
-      const status: Record<WhisperModel, boolean> = {
-        'tiny': false,
-        'base': false,
-        'small': false,
-        'medium': false,
-      };
+    const loadPreferredModel = async () => {
+      const { getPreferredWhisperModel } = await import('@/lib/envProbe');
+      const { probeEnvironment } = await import('@/lib/envProbe');
       
-      for (const model of ['tiny', 'base', 'small', 'medium'] as WhisperModel[]) {
-        try {
-          const available = await checkModelAvailability(model);
-          status[model] = available;
-        } catch {
-          status[model] = false;
-        }
+      const preferred = await getPreferredWhisperModel();
+      const env = await probeEnvironment();
+      
+      setSelectedModel(preferred as WhisperModel);
+      
+      // Determine if bridge or browser
+      if (env.bridge.available && env.bridge.models.includes(preferred)) {
+        setModelSource('bridge');
+        setBridgeDevice(env.bridge.device);
+      } else {
+        setModelSource('browser');
       }
-      
-      setModelCachedStatus(status);
     };
     
-    checkModelStatus();
+    loadPreferredModel();
     
-    // Listen for model cache updates from IALocalSettings
-    const handleModelCacheUpdate = (event: Event) => {
+    // Listen for preferred model changes
+    const handlePreferredModelChange = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { model } = customEvent.detail || {};
       if (model) {
-        // Re-check the specific model
-        import('@/lib/whisperService').then(({ checkModelAvailability }) => {
-          checkModelAvailability(model).then((available) => {
-            setModelCachedStatus(prev => ({ ...prev, [model]: available }));
-          });
-        });
+        loadPreferredModel();
       }
     };
     
-    window.addEventListener('modelCacheUpdated', handleModelCacheUpdate);
+    window.addEventListener('preferredModelChanged', handlePreferredModelChange);
     
     return () => {
-      window.removeEventListener('modelCacheUpdated', handleModelCacheUpdate);
+      window.removeEventListener('preferredModelChanged', handlePreferredModelChange);
     };
   }, []);
 
@@ -301,41 +290,22 @@ export const CompactRecordingBar = ({
           {formatDuration(duration)}
         </Badge>
 
-        {/* Model selector */}
-        <Select 
-          value={selectedModel} 
-          onValueChange={(value) => setSelectedModel(value as WhisperModel)}
-          disabled={disabled || state !== 'idle'}
-        >
-          <SelectTrigger className="w-[160px] h-8">
-            <div className="flex items-center gap-1.5">
-              {modelCachedStatus[selectedModel] ? (
-                <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-500 fill-green-600/20 dark:fill-green-500/20" />
-              ) : (
-                <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30" />
-              )}
-              <SelectValue />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            {(['tiny', 'base', 'small'] as WhisperModel[]).map((model) => {
-              const info = getModelInfo(model);
-              return (
-                <SelectItem key={model} value={model}>
-                  <div className="flex items-center gap-2">
-                    {modelCachedStatus[model] && (
-                      <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-500" />
-                    )}
-                    <span className="capitalize">{model}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {info.sizeMB}MB
-                    </span>
-                  </div>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+        {/* Model indicator badge */}
+        <Badge variant="outline" className="h-6 gap-1.5">
+          <Target className="h-3 w-3" />
+          <span className="capitalize">{selectedModel}</span>
+          {modelSource === 'bridge' ? (
+            <span className="text-xs text-muted-foreground">({bridgeDevice})</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">(Navigateur)</span>
+          )}
+        </Badge>
+
+        {/* Language indicator badge */}
+        <Badge variant="outline" className="h-6 gap-1.5">
+          <Globe className="h-3 w-3" />
+          FR
+        </Badge>
 
         {/* Audio level with VAD indicator */}
         {state === 'recording' && (

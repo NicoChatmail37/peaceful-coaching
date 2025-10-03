@@ -23,10 +23,11 @@ export const WhisperBridgeTest = () => {
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [task, setTask] = useState<"transcribe" | "translate">("transcribe");
-  const [language, setLanguage] = useState<"auto" | "fr" | "en">("auto");
+  const [language, setLanguage] = useState<"auto" | "fr" | "en">("fr");
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionResult, setTranscriptionResult] = useState<TranscriptionResult | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [copiedToSession, setCopiedToSession] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -123,6 +124,7 @@ export const WhisperBridgeTest = () => {
     setIsTranscribing(true);
     setTranscriptionError(null);
     setTranscriptionResult(null);
+    setCopiedToSession(false);
 
     try {
       const result = await transcribeViaBridge(selectedFile, {
@@ -137,6 +139,17 @@ export const WhisperBridgeTest = () => {
       toast.error('Échec de la transcription');
     } finally {
       setIsTranscribing(false);
+    }
+  };
+
+  const handleCopyToSession = () => {
+    if (transcriptionResult?.text) {
+      window.dispatchEvent(new CustomEvent('bridgeTranscriptCopy', { 
+        detail: { text: transcriptionResult.text } 
+      }));
+      setCopiedToSession(true);
+      toast.success('Texte copié dans la séance active');
+      setTimeout(() => setCopiedToSession(false), 2000);
     }
   };
 
@@ -315,11 +328,22 @@ export const WhisperBridgeTest = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Texte transcrit:</label>
-                  {transcriptionResult.duration && (
-                    <Badge variant="secondary">
-                      {transcriptionResult.duration.toFixed(1)}s
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {transcriptionResult.duration && (
+                      <Badge variant="secondary">
+                        {transcriptionResult.duration.toFixed(1)}s
+                      </Badge>
+                    )}
+                    <Button
+                      onClick={handleCopyToSession}
+                      size="sm"
+                      variant="outline"
+                      disabled={copiedToSession}
+                    >
+                      <FileAudio className="h-4 w-4 mr-2" />
+                      {copiedToSession ? "Copié ✓" : "Copier dans la séance"}
+                    </Button>
+                  </div>
                 </div>
                 <Textarea
                   value={transcriptionResult.text}

@@ -294,10 +294,10 @@ export const useRealTimeTranscription = ({
         stereoMode: false // Always mono after downmix
       });
 
-      // Transcribe the chunk
+      // Transcribe the chunk (language forced to French)
       const result = await transcribeAudio(audioBlob, {
         model: model,
-        language: 'fr',
+        language: 'fr', // Always French
         mode: 'auto',
         onProgress: (p) => setProgress(30 + (p * 0.4))
       });

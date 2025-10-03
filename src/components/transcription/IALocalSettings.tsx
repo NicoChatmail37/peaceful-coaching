@@ -17,12 +17,21 @@ import {
   Monitor,
   Laptop,
   Smartphone,
-  Wifi
+  Wifi,
+  Target,
+  Zap
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { WhisperModel } from '@/lib/whisperService';
 import type { EnvironmentProbe } from '@/lib/envProbe';
-import { probeEnvironment, checkWebGPU } from '@/lib/envProbe';
+import { probeEnvironment, checkWebGPU, getPreferredWhisperModel, setPreferredWhisperModel } from '@/lib/envProbe';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getAvailableModelsWithRecommendation } from '@/lib/modelRecommendation';
 import { modelDownloadService, formatBytes, type DownloadProgress } from '@/lib/modelDownloadService';
 import { getTranscriptionDB } from '@/lib/transcriptionStorage';
@@ -45,6 +54,7 @@ export const IALocalSettings = () => {
   const [modelStatuses, setModelStatuses] = useState<ModelStatus[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [downloads, setDownloads] = useState<Map<WhisperModel, DownloadProgress>>(new Map());
+  const [preferredModel, setPreferredModelState] = useState<string>('tiny');
   const [preferences, setPreferences] = useState({
     defaultModel: 'auto' as WhisperModel | 'auto',
     showPrepareDay: true,
@@ -64,6 +74,10 @@ export const IALocalSettings = () => {
       // Load environment
       const env = await probeEnvironment();
       setEnvironment(env);
+      
+      // Load preferred model
+      const preferred = await getPreferredWhisperModel();
+      setPreferredModelState(preferred);
       
       // Load model statuses
       const modelInfo = getAvailableModelsWithRecommendation(env);
@@ -231,6 +245,15 @@ export const IALocalSettings = () => {
     }
   };
 
+  const handleModelChange = async (model: string) => {
+    await setPreferredWhisperModel(model);
+    setPreferredModelState(model);
+    toast({
+      title: "Modèle par défaut mis à jour",
+      description: `Le modèle ${model} sera utilisé pour toutes les transcriptions`,
+    });
+  };
+
   const getDeviceIcon = () => {
     if (!environment) return <Monitor className="h-4 w-4" />;
     switch (environment.device.class) {
@@ -361,12 +384,54 @@ export const IALocalSettings = () => {
       {/* Model Management */}
       <Card>
         <CardHeader>
-          <CardTitle>Gestion des modèles</CardTitle>
+          <CardTitle>Configuration de transcription</CardTitle>
           <CardDescription>
-            Téléchargez, supprimez et gérez vos modèles Whisper locaux
+            Sélectionnez le modèle par défaut et gérez vos modèles Whisper locaux
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        
+        {/* Preferred Model Selector */}
+        <CardContent className="border-b pb-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <label className="text-sm font-semibold">Modèle par défaut pour toutes les transcriptions</label>
+            </div>
+            <Select value={preferredModel} onValueChange={handleModelChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {/* Browser models */}
+                {modelStatuses.filter(m => m.cached && (m.model === 'tiny' || m.model === 'base')).map(m => (
+                  <SelectItem key={m.model} value={m.model}>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="capitalize">{m.model}</span>
+                      <span className="text-xs text-muted-foreground">- Navigateur ({formatBytes(m.size)})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                {/* Bridge models */}
+                {environment?.bridge.available && environment.bridge.models.map(model => (
+                  <SelectItem key={model} value={model}>
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-blue-600" />
+                      <span className="capitalize">{model}</span>
+                      <span className="text-xs text-muted-foreground">- Bridge ({environment.bridge.device})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              🌍 Ce modèle sera utilisé automatiquement dans toutes les séances. La langue française est forcée.
+            </p>
+          </div>
+        </CardContent>
+
+        <CardContent className="pt-6">
+          <h3 className="font-semibold mb-4">Téléchargement de modèles</h3>
           <div className="space-y-4">
             {modelStatuses.map((model) => (
               <div key={model.model} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
