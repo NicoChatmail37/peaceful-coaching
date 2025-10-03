@@ -14,12 +14,10 @@ import {
   CheckCircle, 
   AlertCircle,
   HardDrive,
-  Zap,
   Monitor,
   Laptop,
   Smartphone,
-  Wifi,
-  Server
+  Wifi
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { WhisperModel } from '@/lib/whisperService';
@@ -217,31 +215,6 @@ export const IALocalSettings = () => {
     }
   };
 
-  const handleTestBridge = async () => {
-    try {
-      // Test bridge connection
-      const response = await fetch('http://127.0.0.1:27123/status');
-      if (response.ok) {
-        toast({
-          title: "Bridge connecté",
-          description: "Le bridge local fonctionne correctement"
-        });
-      } else {
-        toast({
-          title: "Bridge déconnecté",
-          description: "Le bridge local n'est pas accessible",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Erreur bridge",
-        description: "Impossible de se connecter au bridge local",
-        variant: "destructive"
-      });
-    }
-  };
-
   const handleTestWebGPU = async () => {
     const webgpuInfo = await checkWebGPU();
     if (webgpuInfo.available) {
@@ -297,14 +270,6 @@ export const IALocalSettings = () => {
           >
             <Monitor className="h-4 w-4 mr-2" />
             Test WebGPU
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTestBridge}
-          >
-            <Server className="h-4 w-4 mr-2" />
-            Test Bridge
           </Button>
           <Button
             variant="outline"
@@ -378,7 +343,7 @@ export const IALocalSettings = () => {
               </div>
             </div>
             
-            <div className="mt-4 pt-4 border-t flex items-center justify-between">
+            <div className="mt-4 pt-4 border-t flex items-center">
               <div className="flex items-center gap-3">
                 <HardDrive className="h-4 w-4 text-muted-foreground" />
                 <div>
@@ -388,18 +353,6 @@ export const IALocalSettings = () => {
                   </div>
                 </div>
               </div>
-              
-              {environment.bridge.available && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTestBridge}
-                  className="w-full sm:w-auto"
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Tester le bridge
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>

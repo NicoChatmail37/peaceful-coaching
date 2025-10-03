@@ -6,48 +6,64 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Upload, CheckCircle, XCircle, Loader2, FileAudio } from 'lucide-react';
-import { 
-  getBridgeStatus, 
-  transcribeBridge, 
-  type BridgeStatus,
-  type WhisperResult
-} from '@/lib/whisperService';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, CheckCircle, XCircle, Loader2, FileAudio, Radio } from 'lucide-react';
+import { pingBridge, transcribeViaBridge, type BridgeStatus, type TranscriptionResult } from '@/services/bridgeClient';
+import { BRIDGE_URL } from '@/config/bridge';
 import { toast } from 'sonner';
 
 export const WhisperBridgeTest = () => {
+  const [useBridge, setUseBridge] = useState(true);
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [task, setTask] = useState<"transcribe" | "translate">("transcribe");
+  const [language, setLanguage] = useState<"auto" | "fr" | "en">("auto");
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptionResult, setTranscriptionResult] = useState<WhisperResult | null>(null);
+  const [transcriptionResult, setTranscriptionResult] = useState<TranscriptionResult | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check bridge status on mount
+  // Check bridge status when enabled
   useEffect(() => {
-    const checkStatus = async () => {
-      setIsCheckingStatus(true);
+    if (!useBridge) {
+      setBridgeStatus(null);
       setBridgeError(null);
-      
-      try {
-        const status = await getBridgeStatus();
+      return;
+    }
+
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort("timeout"), 1500);
+    
+    setIsCheckingStatus(true);
+    setBridgeError(null);
+    
+    pingBridge(ac.signal)
+      .then((status) => {
         setBridgeStatus(status);
         toast.success('Bridge connecté avec succès');
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Erreur de connexion';
+      })
+      .catch((error) => {
+        const errorMsg = error.message || 'Erreur de connexion';
         setBridgeError(errorMsg);
+        setBridgeStatus(null);
         toast.error('Bridge non disponible');
-      } finally {
+      })
+      .finally(() => {
         setIsCheckingStatus(false);
-      }
-    };
+        clearTimeout(timeout);
+      });
 
-    checkStatus();
-  }, []);
+    return () => {
+      ac.abort();
+      clearTimeout(timeout);
+    };
+  }, [useBridge]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -74,7 +90,10 @@ export const WhisperBridgeTest = () => {
     setTranscriptionResult(null);
 
     try {
-      const result = await transcribeBridge(selectedFile, 'small', 'fr');
+      const result = await transcribeViaBridge(selectedFile, {
+        task,
+        language: language === "auto" ? undefined : language
+      });
       setTranscriptionResult(result);
       toast.success('Transcription terminée');
     } catch (error) {
@@ -94,69 +113,63 @@ export const WhisperBridgeTest = () => {
 
   return (
     <div className="space-y-6">
-      {/* Bridge Status Card */}
+      {/* Bridge Configuration */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {isCheckingStatus ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : bridgeStatus?.ok ? (
-              <CheckCircle className="h-5 w-5 text-green-600" />
-            ) : (
-              <XCircle className="h-5 w-5 text-red-600" />
-            )}
-            Whisper Bridge Local
+            <Radio className="h-5 w-5" />
+            Configuration du Bridge Local
           </CardTitle>
           <CardDescription>
-            Test de connexion au bridge local (http://127.0.0.1:27123)
+            Whisper Bridge sur {BRIDGE_URL}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {isCheckingStatus ? (
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="use-bridge"
+              checked={useBridge}
+              onCheckedChange={setUseBridge}
+            />
+            <Label htmlFor="use-bridge">
+              Utiliser le bridge local (http://127.0.0.1:27123)
+            </Label>
+          </div>
+
+          {!useBridge ? (
+            <div className="text-sm text-muted-foreground">
+              Bridge désactivé.
+            </div>
+          ) : isCheckingStatus ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Vérification du statut...
             </div>
-          ) : bridgeStatus?.ok ? (
-            <div className="space-y-2">
-              <Badge variant="default" className="bg-green-600">
-                ✅ Bridge connecté
-              </Badge>
-              {bridgeStatus.device && (
-                <p className="text-sm text-muted-foreground">
-                  Device: <span className="font-mono">{bridgeStatus.device}</span>
-                </p>
-              )}
-              {bridgeStatus.models && bridgeStatus.models.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Modèles disponibles:</p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {bridgeStatus.models.map((model, idx) => (
-                      <li key={idx} className="font-mono">
-                        • {model.name}
-                        {model.sizeMB && ` (${model.sizeMB}MB)`}
-                        {model.quant && ` - ${model.quant}`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : (
+          ) : bridgeError ? (
             <Alert variant="destructive">
               <XCircle className="h-4 w-4" />
               <AlertDescription>
-                ❌ Bridge non disponible
-                {bridgeError && (
-                  <div className="mt-2 text-xs font-mono">{bridgeError}</div>
-                )}
+                ❌ Bridge non disponible — {bridgeError}
               </AlertDescription>
             </Alert>
-          )}
+          ) : bridgeStatus?.ok ? (
+            <div className="space-y-2">
+              <Badge variant="default" className="bg-green-600">
+                ✅ Bridge OK
+              </Badge>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>Modèle: <span className="font-mono">{bridgeStatus.model}</span></p>
+                <p>Device: <span className="font-mono">{bridgeStatus.device}</span></p>
+                {bridgeStatus.compute_type && (
+                  <p>Compute: <span className="font-mono">{bridgeStatus.compute_type}</span></p>
+                )}
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      {/* Transcription Test Card */}
+      {/* Transcription Test */}
       <Card>
         <CardHeader>
           <CardTitle>Test de transcription</CardTitle>
@@ -165,6 +178,44 @@ export const WhisperBridgeTest = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Task and Language Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="task">Mode</Label>
+              <Select
+                value={task}
+                onValueChange={(value) => setTask(value as "transcribe" | "translate")}
+                disabled={!useBridge || !bridgeStatus?.ok}
+              >
+                <SelectTrigger id="task">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="transcribe">Transcribe (garder la langue)</SelectItem>
+                  <SelectItem value="translate">Translate → anglais</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="language">Langue</Label>
+              <Select
+                value={language}
+                onValueChange={(value) => setLanguage(value as "auto" | "fr" | "en")}
+                disabled={!useBridge || !bridgeStatus?.ok}
+              >
+                <SelectTrigger id="language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-détection</SelectItem>
+                  <SelectItem value="fr">Français</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* File Selection */}
           <div className="space-y-2">
             <input
@@ -178,7 +229,7 @@ export const WhisperBridgeTest = () => {
               onClick={() => fileInputRef.current?.click()}
               variant="outline"
               className="w-full"
-              disabled={!bridgeStatus?.ok}
+              disabled={!useBridge || !bridgeStatus?.ok}
             >
               <Upload className="h-4 w-4 mr-2" />
               Sélectionner un fichier audio
@@ -196,7 +247,7 @@ export const WhisperBridgeTest = () => {
           {/* Transcribe Button */}
           <Button
             onClick={handleTranscribe}
-            disabled={!selectedFile || !bridgeStatus?.ok || isTranscribing}
+            disabled={!selectedFile || !useBridge || !bridgeStatus?.ok || isTranscribing}
             className="w-full"
           >
             {isTranscribing ? (
@@ -226,7 +277,14 @@ export const WhisperBridgeTest = () => {
               
               {/* Text Result */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Texte transcrit:</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Texte transcrit:</label>
+                  {transcriptionResult.duration && (
+                    <Badge variant="secondary">
+                      {transcriptionResult.duration.toFixed(1)}s
+                    </Badge>
+                  )}
+                </div>
                 <Textarea
                   value={transcriptionResult.text}
                   readOnly
@@ -246,13 +304,8 @@ export const WhisperBridgeTest = () => {
                         <div key={idx} className="text-sm space-y-1">
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Badge variant="outline" className="font-mono">
-                              {formatTime(segment.t0)} → {formatTime(segment.t1)}
+                              {formatTime(segment.start)} → {formatTime(segment.end)}
                             </Badge>
-                            {segment.conf !== undefined && (
-                              <span className="text-xs">
-                                {(segment.conf * 100).toFixed(0)}%
-                              </span>
-                            )}
                           </div>
                           <p className="pl-2 border-l-2 border-muted">
                             {segment.text}
