@@ -11,7 +11,8 @@ import {
   Wand2,
   Settings,
   FileText,
-  CheckCircle
+  CheckCircle,
+  Package
 } from "lucide-react";
 import { useAudioRecording } from "@/hooks/useAudioRecording";
 import { useRealTimeTranscription } from "@/hooks/useRealTimeTranscription";
@@ -25,7 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { getModelInfo, type WhisperModel } from "@/lib/whisperService";
+import { AudioChunksPanel } from "@/components/transcription/AudioChunksPanel";
 
 interface CompactRecordingBarProps {
   onTranscriptUpdate: (text: string) => void;
@@ -46,6 +53,7 @@ export const CompactRecordingBar = ({
   const [showSettings, setShowSettings] = useState(false);
   const [selectedModel, setSelectedModel] = useState<WhisperModel>('tiny');
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('auto-60s');
+  const [showChunksPanel, setShowChunksPanel] = useState(false);
   const [vadActivity, setVadActivity] = useState<{ active: boolean; threshold: number; level: number }>({
     active: false,
     threshold: 0.02,
@@ -87,6 +95,16 @@ export const CompactRecordingBar = ({
     onTranscriptUpdate,
     stereoMode: false, // Force mono after RMS downmix
     model: selectedModel
+  });
+
+  const { 
+    chunks, 
+    addChunk, 
+    refreshChunks 
+  } = useAudioChunks({ 
+    sessionId, 
+    clientId, 
+    autoRefresh: true 
   });
 
   // Check model cached status on mount and sync with settings
@@ -156,7 +174,6 @@ export const CompactRecordingBar = ({
     }
     
     startRealTimeTranscription();
-    const { addChunk } = useAudioChunks({ sessionId, clientId });
     await startRecording({ 
       enableStereo, 
       onAudioChunk: processAudioChunk,
@@ -331,7 +348,7 @@ export const CompactRecordingBar = ({
                 />
               </div>
               <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <span>Gain: 2.5x</span>
+                <span>Gain: 1.5x</span>
                 {vadActivity.active && (
                   <span className="text-green-500 animate-pulse">● VOIX</span>
                 )}
@@ -388,6 +405,26 @@ export const CompactRecordingBar = ({
             {isGeneratingSummary ? "..." : "Résumé"}
           </Button>
 
+          {/* Audio chunks button */}
+          <Sheet open={showChunksPanel} onOpenChange={setShowChunksPanel}>
+            <SheetTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8"
+              >
+                <Package className="h-4 w-4 mr-1" />
+                Morceaux ({chunks.length})
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+              <AudioChunksPanel 
+                sessionId={sessionId} 
+                clientId={clientId}
+              />
+            </SheetContent>
+          </Sheet>
+
           {/* Settings button */}
           <Button
             onClick={() => setShowSettings(!showSettings)}
@@ -424,7 +461,7 @@ export const CompactRecordingBar = ({
             <div className="font-medium">Voice Activity Detection (VAD)</div>
             <div className="text-muted-foreground">
               • Détection automatique des pauses (2.5s)<br/>
-              • Gain audio: 2.5x (microphones professionnels)<br/>
+              • Gain audio: 1.5x (microphones professionnels)<br/>
               • Compression dynamique pour stabilisation<br/>
               • Seuil adaptatif selon l'environnement
             </div>
