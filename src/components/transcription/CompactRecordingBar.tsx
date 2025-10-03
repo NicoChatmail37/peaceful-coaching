@@ -11,7 +11,6 @@ import {
   Wand2,
   Settings,
   FileText,
-  Package,
   Target,
   Globe
 } from "lucide-react";
@@ -27,16 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
 import { getModelInfo, type WhisperModel } from "@/lib/whisperService";
-import { AudioChunksPanel } from "@/components/transcription/AudioChunksPanel";
 
 interface CompactRecordingBarProps {
   onTranscriptUpdate: (text: string) => void;
@@ -61,7 +51,6 @@ export const CompactRecordingBar = ({
   const [modelSource, setModelSource] = useState<'browser' | 'bridge'>('browser');
   const [bridgeDevice, setBridgeDevice] = useState<string>('');
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('auto-60s');
-  const [showChunksPanel, setShowChunksPanel] = useState(false);
   const [vadActivity, setVadActivity] = useState<{ active: boolean; threshold: number; level: number }>({
     active: false,
     threshold: 0.02,
@@ -384,34 +373,6 @@ export const CompactRecordingBar = ({
             <Wand2 className="h-4 w-4 mr-1" />
             {isGeneratingSummary ? "..." : "Résumé"}
           </Button>
-
-          {/* Audio chunks button */}
-          <Sheet open={showChunksPanel} onOpenChange={setShowChunksPanel}>
-            <SheetTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8"
-              >
-                <Package className="h-4 w-4 mr-1" />
-                Morceaux ({chunks.length})
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Morceaux audio - {clientName}</SheetTitle>
-                <SheetDescription>
-                  Gérez et transcrivez vos enregistrements audio par morceaux
-                </SheetDescription>
-              </SheetHeader>
-              <AudioChunksPanel 
-                sessionId={sessionId} 
-                clientId={clientId}
-                clientName={clientName}
-                whisperModel={selectedModel}
-              />
-            </SheetContent>
-          </Sheet>
 
           {/* Settings button */}
           <Button

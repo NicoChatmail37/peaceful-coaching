@@ -11,6 +11,7 @@ import { Save, FileText, Clock, CheckCircle, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { CompactRecordingBar } from "@/components/transcription/CompactRecordingBar";
 import { GlobalSessionReport } from "@/components/transcription/GlobalSessionReport";
+import { AudioChunksHorizontalBand } from "@/components/transcription/AudioChunksHorizontalBand";
 
 interface SessionActiveProps {
   sessionId: string;
@@ -77,6 +78,19 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
       setNotes(prev => prev + (prev ? '\n\n' : '') + 'Conclusions précédentes:\n' + lastSessionConclusions);
       toast({ title: "Conclusions insérées dans les notes" });
     }
+  };
+
+  const handleChunkTranscribed = (chunkId: string, text: string, timestamp: Date) => {
+    // Format timestamp as [HH:MM]
+    const hours = timestamp.getHours().toString().padStart(2, '0');
+    const minutes = timestamp.getMinutes().toString().padStart(2, '0');
+    const timePrefix = `[${hours}:${minutes}]`;
+    
+    // Append to transcript with timestamp
+    setTranscriptText(prev => {
+      const separator = prev ? '\n\n' : '';
+      return prev + separator + timePrefix + ' ' + text;
+    });
   };
 
   if (!session) {
@@ -155,6 +169,15 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
             setNotes(prev => prev + (prev ? '\n\n' : '') + '**Résumé automatique:**\n' + summary);
           }}
           disabled={session.status === 'done'}
+        />
+      </div>
+
+      {/* Bande horizontale des morceaux audio */}
+      <div className="border-b border-border p-3">
+        <AudioChunksHorizontalBand
+          sessionId={sessionId}
+          clientId={clientId}
+          onChunkTranscribed={handleChunkTranscribed}
         />
       </div>
 
