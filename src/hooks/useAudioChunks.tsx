@@ -78,7 +78,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
    * Transcribe a specific chunk
    */
   const transcribeChunk = useCallback(
-    async (chunkId: string, modelId: WhisperModel = 'base'): Promise<void> => {
+    async (chunkId: string, modelId: WhisperModel = 'base'): Promise<string> => {
       setIsTranscribing(prev => ({ ...prev, [chunkId]: true }));
 
       try {
@@ -89,7 +89,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
 
         if (chunk.transcribed) {
           toast.info('Ce morceau est déjà transcrit');
-          return;
+          return chunk.transcriptText || '';
         }
 
         console.log('🎤 Transcribing chunk:', chunkId);
@@ -105,6 +105,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
         await updateChunkTranscription(chunkId, result.text);
         await refreshChunks();
         toast.success('Transcription terminée');
+        return result.text;
       } catch (error) {
         console.error('Failed to transcribe chunk:', error);
         toast.error('Erreur lors de la transcription');
@@ -123,7 +124,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
     async (
       chunkId: string,
       leftSpeaker: 'Praticien' | 'Client' = 'Praticien'
-    ): Promise<void> => {
+    ): Promise<string> => {
       setIsTranscribing(prev => ({ ...prev, [chunkId]: true }));
 
       try {
@@ -134,7 +135,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
 
         if (chunk.transcribed) {
           toast.info('Ce morceau est déjà transcrit');
-          return;
+          return chunk.transcriptText || '';
         }
 
         console.log('🎤 Transcribing chunk (stereo):', chunkId);
@@ -161,6 +162,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
         await updateChunkStereoTranscription(chunkId, combinedText, stereoTranscript);
         await refreshChunks();
         toast.success('Transcription stéréo terminée');
+        return combinedText;
       } catch (error) {
         console.error('Failed to transcribe chunk (stereo):', error);
         toast.error('Erreur lors de la transcription stéréo');

@@ -87,16 +87,18 @@ export const AudioChunksHorizontalBand = ({
 
   const handleTranscribe = async (chunkId: string) => {
     try {
+      let transcriptText: string;
+      
       if (enableStereo) {
-        await transcribeChunkStereo(chunkId, leftSpeaker);
+        transcriptText = await transcribeChunkStereo(chunkId, leftSpeaker);
       } else {
-        await transcribeChunk(chunkId, whisperModel);
+        transcriptText = await transcribeChunk(chunkId, whisperModel);
       }
       
-      // Emit event for parent component
+      // Get the chunk for timestamp
       const chunk = chunks.find(c => c.id === chunkId);
-      if (chunk?.transcriptText && onChunkTranscribed) {
-        onChunkTranscribed(chunkId, chunk.transcriptText, chunk.timestamp);
+      if (transcriptText && onChunkTranscribed && chunk) {
+        onChunkTranscribed(chunkId, transcriptText, chunk.timestamp);
       }
     } catch (error) {
       console.error('Transcription error:', error);
