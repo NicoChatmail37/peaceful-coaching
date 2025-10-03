@@ -154,17 +154,22 @@ export const CompactRecordingBar = ({
   };
 
   const handleStart = async () => {
-    try {
-      const { initWhisper } = await import('@/lib/whisperService');
-      await initWhisper(selectedModel);
-    } catch (error) {
-      console.error('Failed to pre-load pipeline:', error);
-      toast({
-        title: "Erreur de chargement du modèle",
-        description: `Impossible de charger le modèle ${selectedModel}. Vérifiez qu'il est téléchargé.`,
-        variant: "destructive"
-      });
-      return;
+    // Ne charger le pipeline que si on utilise le navigateur
+    if (modelSource === 'browser') {
+      try {
+        const { initWhisper } = await import('@/lib/whisperService');
+        await initWhisper(selectedModel);
+      } catch (error) {
+        console.error('Failed to pre-load pipeline:', error);
+        toast({
+          title: "Erreur de chargement du modèle",
+          description: `Impossible de charger le modèle ${selectedModel}. Vérifiez qu'il est téléchargé.`,
+          variant: "destructive"
+        });
+        return;
+      }
+    } else {
+      console.log('🔗 Utilisation du bridge, pas d\'initialisation locale');
     }
     
     startRealTimeTranscription();

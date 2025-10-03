@@ -433,27 +433,44 @@ export const IALocalSettings = () => {
         <CardContent className="pt-6">
           <h3 className="font-semibold mb-4">Téléchargement de modèles</h3>
           <div className="space-y-4">
-            {modelStatuses.map((model) => (
-              <div key={model.model} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="flex items-center gap-2">
-                      {model.cached ? (
-                        <div className="flex items-center gap-1.5">
-                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-500 fill-green-600/20 dark:fill-green-500/20" />
-                          <Badge variant="secondary" className="bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 border-green-300 dark:border-green-800">
-                            Prêt
-                          </Badge>
+            {modelStatuses
+              .filter(model => {
+                // Afficher les modèles navigateur téléchargés
+                if (model.cached && (model.model === 'tiny' || model.model === 'base')) return true;
+                // Afficher les modèles bridge réellement disponibles
+                if (environment?.bridge.available && environment.bridge.models.includes(model.model)) return true;
+                // Afficher tiny/base même s'ils ne sont pas téléchargés (pour permettre le téléchargement)
+                if (model.model === 'tiny' || model.model === 'base') return true;
+                return false;
+              })
+              .map((model) => {
+                const isAvailable = model.cached || 
+                  (environment?.bridge.available && environment.bridge.models.includes(model.model));
+                
+                return (
+                  <div key={model.model} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-2">
+                          {isAvailable ? (
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-500 fill-green-600/20 dark:fill-green-500/20" />
+                              <Badge variant="secondary" className="bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 border-green-300 dark:border-green-800">
+                                Prêt
+                              </Badge>
+                            </div>
+                          ) : (
+                            <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20" />
+                          )}
+                          <h3 className="font-medium capitalize">{model.model}</h3>
                         </div>
-                      ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/20" />
-                      )}
-                      <h3 className="font-medium capitalize">{model.model}</h3>
-                    </div>
-                    {!model.available && <AlertCircle className="h-4 w-4 text-warning" />}
-                    {model.requiresBridge && (
-                      <Badge variant="secondary" className="text-xs">Bridge</Badge>
-                    )}
+                        {!model.available && <AlertCircle className="h-4 w-4 text-warning" />}
+                        {environment?.bridge.available && environment.bridge.models.includes(model.model) && (
+                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                            <Zap className="h-3 w-3" />
+                            Bridge ({environment.bridge.device})
+                          </Badge>
+                        )}
                   </div>
                   <p className="text-sm text-muted-foreground mb-1">
                     {model.description}
@@ -480,58 +497,53 @@ export const IALocalSettings = () => {
                           </div>
                         )}
                       </div>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex items-center gap-2 ml-4">
-                  {model.cached ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteModel(model.model)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  ) : environment?.bridge.available && environment.bridge.models.includes(model.model) ? (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="default" className="bg-green-600 text-white">
-                        ✅ Disponible via Bridge ({environment.bridge.device?.toUpperCase()})
-                      </Badge>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2 ml-4">
+                    {model.cached && (model.model === 'tiny' || model.model === 'base') ? (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          const event = new CustomEvent('openBridgeTest');
-                          window.dispatchEvent(event);
-                        }}
+                        onClick={() => handleDeleteModel(model.model)}
+                        className="text-destructive hover:text-destructive"
                       >
-                        Ouvrir Bridge Test →
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
-                  ) : model.available && !model.downloading ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownloadModel(model.model)}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Télécharger
-                    </Button>
-                  ) : model.downloading ? (
-                    <Button variant="outline" size="sm" disabled>
-                      <Download className="h-4 w-4 mr-2 animate-pulse" />
-                      Téléchargement...
-                    </Button>
-                  ) : (
-                    <Badge variant="secondary" className="text-xs">
-                      Indisponible
-                    </Badge>
-                  )}
+                    ) : environment?.bridge.available && environment.bridge.models.includes(model.model) ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const event = new CustomEvent('openBridgeTest');
+                            window.dispatchEvent(event);
+                          }}
+                        >
+                          Ouvrir Bridge Test →
+                        </Button>
+                      </div>
+                    ) : !model.cached && (model.model === 'tiny' || model.model === 'base') && !model.downloading ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadModel(model.model)}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Télécharger
+                      </Button>
+                    ) : model.downloading ? (
+                      <Button variant="outline" size="sm" disabled>
+                        <Download className="h-4 w-4 mr-2 animate-pulse" />
+                        Téléchargement...
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })
+          }
           </div>
         </CardContent>
       </Card>
