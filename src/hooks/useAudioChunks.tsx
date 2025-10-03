@@ -6,10 +6,12 @@ import {
   getAudioChunksBySession,
   getUntranscribedChunks,
   updateChunkTranscription,
+  updateChunkStereoTranscription,
   deleteAudioChunk,
   deleteChunksBySession,
 } from '@/lib/audioChunksStorage';
 import { transcribeAudio, type WhisperModel } from '@/lib/whisperService';
+import { transcribeViaBridgeStereo } from '@/services/bridgeClient';
 import { toast } from 'sonner';
 
 interface UseAudioChunksOptions {
@@ -106,6 +108,62 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
       } catch (error) {
         console.error('Failed to transcribe chunk:', error);
         toast.error('Erreur lors de la transcription');
+        throw error;
+      } finally {
+        setIsTranscribing(prev => ({ ...prev, [chunkId]: false }));
+      }
+    },
+    [refreshChunks]
+  );
+
+  /**
+   * Transcribe a specific chunk in stereo mode (separate left/right channels)
+   */
+  const transcribeChunkStereo = useCallback(
+    async (
+      chunkId: string,
+      leftSpeaker: 'Praticien' | 'Client' = 'Praticien'
+    ): Promise<void> => {
+      setIsTranscribing(prev => ({ ...prev, [chunkId]: true }));
+
+      try {
+        const chunk = await getAudioChunk(chunkId);
+        if (!chunk) {
+          throw new Error('Chunk not found');
+        }
+
+        if (chunk.transcribed) {
+          toast.info('Ce morceau est déjà transcrit');
+          return;
+        }
+
+        console.log('🎤 Transcribing chunk (stereo):', chunkId);
+        const result = await transcribeViaBridgeStereo(chunk.blob, {
+          language: 'auto'
+        });
+
+        // Assign roles based on parameter
+        const rightSpeaker: 'Praticien' | 'Client' = leftSpeaker === 'Praticien' ? 'Client' : 'Praticien';
+        const stereoTranscript = {
+          left: {
+            ...result.left,
+            speaker: leftSpeaker
+          },
+          right: {
+            ...result.right,
+            speaker: rightSpeaker
+          }
+        };
+
+        // Format: [Speaker] text...\n\n[Speaker] text...
+        const combinedText = `[${stereoTranscript.left.speaker}] ${result.left.text}\n\n[${stereoTranscript.right.speaker}] ${result.right.text}`;
+
+        await updateChunkStereoTranscription(chunkId, combinedText, stereoTranscript);
+        await refreshChunks();
+        toast.success('Transcription stéréo terminée');
+      } catch (error) {
+        console.error('Failed to transcribe chunk (stereo):', error);
+        toast.error('Erreur lors de la transcription stéréo');
         throw error;
       } finally {
         setIsTranscribing(prev => ({ ...prev, [chunkId]: false }));
@@ -226,6 +284,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
     isTranscribing,
     addChunk,
     transcribeChunk,
+    transcribeChunkStereo,
     transcribeAllChunks,
     removeChunk,
     clearAllChunks,

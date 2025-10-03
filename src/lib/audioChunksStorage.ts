@@ -14,6 +14,11 @@ export interface AudioChunk {
   transcriptText?: string;
   source: 'recorded' | 'uploaded'; // Track origin
   fileName?: string; // For uploaded files
+  isStereo?: boolean;
+  stereoTranscript?: {
+    left: { text: string; duration: number; speaker: 'Praticien' | 'Client' };
+    right: { text: string; duration: number; speaker: 'Praticien' | 'Client' };
+  };
 }
 
 let dbInstance: IDBPDatabase | null = null;
@@ -127,6 +132,31 @@ export async function updateChunkTranscription(
   chunk.transcriptText = transcriptText;
   await db.put('audioChunks', chunk);
   console.log('✅ Updated transcription for chunk:', id);
+}
+
+/**
+ * Update stereo transcription data for a chunk
+ */
+export async function updateChunkStereoTranscription(
+  id: string,
+  transcriptText: string,
+  stereoTranscript: {
+    left: { text: string; duration: number; speaker: 'Praticien' | 'Client' };
+    right: { text: string; duration: number; speaker: 'Praticien' | 'Client' };
+  }
+): Promise<void> {
+  const db = await getDB();
+  const chunk = await db.get('audioChunks', id);
+  if (!chunk) {
+    throw new Error(`Audio chunk ${id} not found`);
+  }
+
+  chunk.transcribed = true;
+  chunk.transcriptText = transcriptText;
+  chunk.isStereo = true;
+  chunk.stereoTranscript = stereoTranscript;
+  await db.put('audioChunks', chunk);
+  console.log('✅ Updated stereo transcription for chunk:', id);
 }
 
 /**

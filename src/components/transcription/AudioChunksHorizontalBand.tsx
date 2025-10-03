@@ -10,6 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Play, FileText, Download, Trash2, MoreVertical, Upload, CheckCircle, Clock } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAudioChunks } from "@/hooks/useAudioChunks";
 import { toast } from "@/hooks/use-toast";
 import type { WhisperModel } from "@/lib/whisperService";
@@ -18,6 +26,7 @@ interface AudioChunksHorizontalBandProps {
   sessionId: string;
   clientId: string;
   whisperModel?: WhisperModel;
+  enableStereo?: boolean;
   onChunkTranscribed?: (chunkId: string, text: string, timestamp: Date) => void;
 }
 
@@ -25,18 +34,21 @@ export const AudioChunksHorizontalBand = ({
   sessionId,
   clientId,
   whisperModel = 'base',
+  enableStereo = false,
   onChunkTranscribed,
 }: AudioChunksHorizontalBandProps) => {
   const {
     chunks,
     isTranscribing,
     transcribeChunk,
+    transcribeChunkStereo,
     removeChunk,
     downloadChunk,
     addChunk,
   } = useAudioChunks({ sessionId, clientId, autoRefresh: true });
 
   const [playingChunk, setPlayingChunk] = useState<string | null>(null);
+  const [leftSpeaker, setLeftSpeaker] = useState<'Praticien' | 'Client'>('Praticien');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,7 +87,11 @@ export const AudioChunksHorizontalBand = ({
 
   const handleTranscribe = async (chunkId: string) => {
     try {
-      await transcribeChunk(chunkId, whisperModel);
+      if (enableStereo) {
+        await transcribeChunkStereo(chunkId, leftSpeaker);
+      } else {
+        await transcribeChunk(chunkId, whisperModel);
+      }
       
       // Emit event for parent component
       const chunk = chunks.find(c => c.id === chunkId);
@@ -188,15 +204,40 @@ export const AudioChunksHorizontalBand = ({
     <div className="border rounded-lg bg-muted/20">
       <ScrollArea className="w-full">
         <div className="flex gap-2 p-3">
+          {/* Speaker role selector for stereo mode */}
+          {enableStereo && chunks.length > 0 && (
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border border-border">
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                Gauche =
+              </Label>
+              <Select value={leftSpeaker} onValueChange={(v) => setLeftSpeaker(v as 'Praticien' | 'Client')}>
+                <SelectTrigger className="h-8 w-28 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Praticien">Praticien</SelectItem>
+                  <SelectItem value="Client">Client</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {chunks.map((chunk, index) => (
             <Card 
               key={chunk.id} 
               className="flex-shrink-0 w-48 p-3 space-y-2 bg-card"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Morceau {index + 1}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Morceau {index + 1}
+                  </span>
+                  {chunk.isStereo && (
+                    <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
+                      🎧
+                    </Badge>
+                  )}
+                </div>
                 <Badge 
                   variant={chunk.transcribed ? "default" : "secondary"}
                   className="h-5 text-xs"

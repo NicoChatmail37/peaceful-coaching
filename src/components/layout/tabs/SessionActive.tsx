@@ -26,6 +26,7 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
   const [notes, setNotes] = useState("");
   const [transcriptText, setTranscriptText] = useState("");
   const [lastSessionConclusions, setLastSessionConclusions] = useState("");
+  const [enableStereo, setEnableStereo] = useState(false);
 
   const session = sessions.find(s => s.id === sessionId);
 
@@ -168,6 +169,7 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
           onSummaryGenerated={(summary) => {
             setNotes(prev => prev + (prev ? '\n\n' : '') + '**Résumé automatique:**\n' + summary);
           }}
+          onStereoChange={setEnableStereo}
           disabled={session.status === 'done'}
         />
       </div>
@@ -177,6 +179,7 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
         <AudioChunksHorizontalBand
           sessionId={sessionId}
           clientId={clientId}
+          enableStereo={enableStereo}
           onChunkTranscribed={handleChunkTranscribed}
         />
       </div>

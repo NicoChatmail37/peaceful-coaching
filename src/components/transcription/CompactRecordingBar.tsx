@@ -35,6 +35,7 @@ interface CompactRecordingBarProps {
   sessionId: string;
   clientId: string;
   clientName?: string;
+  onStereoChange?: (enabled: boolean) => void;
 }
 
 export const CompactRecordingBar = ({
@@ -43,7 +44,8 @@ export const CompactRecordingBar = ({
   disabled = false,
   sessionId,
   clientId,
-  clientName = 'Client'
+  clientName = 'Client',
+  onStereoChange,
 }: CompactRecordingBarProps) => {
   const [enableStereo, setEnableStereo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -400,7 +402,10 @@ export const CompactRecordingBar = ({
             </div>
             <Switch
               checked={enableStereo}
-              onCheckedChange={setEnableStereo}
+              onCheckedChange={(checked) => {
+                setEnableStereo(checked);
+                onStereoChange?.(checked);
+              }}
               disabled={disabled || state !== 'idle'}
             />
           </div>

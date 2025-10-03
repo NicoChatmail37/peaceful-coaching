@@ -21,6 +21,18 @@ export interface TranscriptionResult {
   }>;
 }
 
+export interface StereoTranscriptionResult {
+  left: {
+    text: string;
+    duration: number;
+  };
+  right: {
+    text: string;
+    duration: number;
+  };
+  total_duration: number;
+}
+
 export interface TranscriptionOptions {
   task?: "transcribe" | "translate";
   language?: string | "auto";
@@ -77,6 +89,40 @@ export async function transcribeViaBridge(
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Bridge ${res.status} ${res.statusText} ${text}`);
+  }
+  
+  return res.json();
+}
+
+/**
+ * Transcrit un fichier audio stéréo via le bridge (canaux séparés)
+ */
+export async function transcribeViaBridgeStereo(
+  file: Blob,
+  opts?: TranscriptionOptions
+): Promise<StereoTranscriptionResult> {
+  const form = new FormData();
+  form.append("audio", file);
+  form.append("task", opts?.task ?? "transcribe");
+  
+  if (opts?.language && opts.language !== "auto") {
+    form.append("language", opts.language);
+  }
+
+  const res = await fetch(`${BRIDGE_URL}/transcribe_stereo`, {
+    method: "POST",
+    mode: "cors",
+    headers: { 
+      Authorization: `Bearer ${BRIDGE_TOKEN}` 
+    },
+    body: form,
+    credentials: "omit",
+    signal: opts?.signal,
+  });
+  
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Bridge stereo ${res.status} ${res.statusText} ${text}`);
   }
   
   return res.json();
