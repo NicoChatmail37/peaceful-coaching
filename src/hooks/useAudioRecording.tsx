@@ -18,10 +18,11 @@ export interface AudioRecordingHook {
   duration: number;
   audioLevel: number;
   stereoInfo: StereoInfo;
-  startRecording: (enableStereo?: boolean, onAudioChunk?: (blob: Blob) => void) => Promise<void>;
+  startRecording: (options?: { enableStereo?: boolean; onAudioChunk?: (blob: Blob) => void; mode?: any; onChunkReady?: (blob: Blob, duration: number) => void }) => Promise<void>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   stopRecording: () => Promise<Blob | null>;
+  markChunk: () => void;
   isSupported: boolean;
 }
 
@@ -71,7 +72,9 @@ export function useAudioRecording(): AudioRecordingHook {
     return isChrome || isEdge;
   }, []);
 
-  const startRecording = useCallback(async (enableStereo = false, onAudioChunk?: (blob: Blob) => void) => {
+  const startRecording = useCallback(async (options?: { enableStereo?: boolean; onAudioChunk?: (blob: Blob) => void; mode?: any; onChunkReady?: (blob: Blob, duration: number) => void }) => {
+    const enableStereo = options?.enableStereo || false;
+    const onAudioChunk = options?.onAudioChunk;
     if (!isSupported) {
       toast({
         title: "Non supporté",
@@ -203,7 +206,7 @@ export function useAudioRecording(): AudioRecordingHook {
       // Create and start AudioWorkletRecorder (records original stream as WAV)
       recorderRef.current = new AudioWorkletRecorder({
         sampleRate: 16000, // Whisper optimal rate
-        timesliceMs: 6000, // Emit chunks every 6 seconds (reduced hallucinations)
+        mode: options?.mode || 'auto-60s',
         onChunk: (blob) => {
           console.log('📼 AW chunk received in hook', { 
             type: blob.type, 
@@ -211,6 +214,7 @@ export function useAudioRecording(): AudioRecordingHook {
           });
           onAudioChunk?.(blob); // Forward to real-time transcription
         },
+        onChunkReady: options?.onChunkReady,
         onError: (error) => {
           console.error('❌ AudioWorkletRecorder error:', error);
           toast({
@@ -366,6 +370,12 @@ export function useAudioRecording(): AudioRecordingHook {
     }
   }, []);
 
+  const markChunk = useCallback(() => {
+    if (recorderRef.current) {
+      recorderRef.current.markChunk();
+    }
+  }, []);
+
   return {
     state,
     duration,
@@ -375,6 +385,7 @@ export function useAudioRecording(): AudioRecordingHook {
     pauseRecording,
     resumeRecording,
     stopRecording,
+    markChunk,
     isSupported,
   };
 }

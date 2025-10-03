@@ -3,10 +3,14 @@
  * Captures audio as Float32Array, downsamples to 16kHz mono, encodes to WAV PCM16
  */
 
+export type RecordingMode = 'auto-6s' | 'auto-30s' | 'auto-60s' | 'manual';
+
 export interface AudioWorkletRecorderOptions {
   sampleRate?: number; // Target sample rate (default: 16000 for Whisper)
   timesliceMs?: number; // Emit chunks every N milliseconds (default: 3000)
+  mode?: RecordingMode; // Recording mode (default: 'auto-6s')
   onChunk?: (blob: Blob) => void; // Called for each chunk during recording
+  onChunkReady?: (blob: Blob, duration: number) => void; // Called when chunk is ready (for storage)
   onDataAvailable?: (blob: Blob) => void; // Called at stop with final chunk
   onError?: (error: Error) => void;
 }
@@ -20,7 +24,9 @@ export class AudioWorkletRecorder {
   private isRecording = false;
   private targetSampleRate: number;
   private timesliceMs: number;
+  private mode: RecordingMode;
   private onChunk?: (blob: Blob) => void;
+  private onChunkReady?: (blob: Blob, duration: number) => void;
   private onDataAvailable?: (blob: Blob) => void;
   private onError?: (error: Error) => void;
   private accumulatedSamples = 0;
@@ -28,9 +34,23 @@ export class AudioWorkletRecorder {
   private nativeSampleRate = 48000;
 
   constructor(options: AudioWorkletRecorderOptions = {}) {
+    this.mode = options.mode || 'auto-6s';
     this.targetSampleRate = options.sampleRate || 16000;
-    this.timesliceMs = options.timesliceMs || 3000;
+    
+    // Set timeslice based on mode
+    if (this.mode === 'auto-6s') {
+      this.timesliceMs = 6000;
+    } else if (this.mode === 'auto-30s') {
+      this.timesliceMs = 30000;
+    } else if (this.mode === 'auto-60s') {
+      this.timesliceMs = 60000;
+    } else {
+      // Manual mode uses custom or default
+      this.timesliceMs = options.timesliceMs || 6000;
+    }
+    
     this.onChunk = options.onChunk;
+    this.onChunkReady = options.onChunkReady;
     this.onDataAvailable = options.onDataAvailable;
     this.onError = options.onError;
     this.sliceSamples = Math.floor(this.targetSampleRate * (this.timesliceMs / 1000));
@@ -81,7 +101,11 @@ export class AudioWorkletRecorder {
           const useLeft = sumLeft >= sumRight;
           const sourceChannel = useLeft ? left : right;
           
-          console.log('🎚️ Downmix', { picked: useLeft ? 'L' : 'R', rmsL: Math.sqrt(sumLeft / left.length).toFixed(4), rmsR: Math.sqrt(sumRight / right.length).toFixed(4) });
+          console.log('🎚️ Downmix', { 
+            picked: useLeft ? 'L' : 'R', 
+            rmsL: Math.sqrt(sumLeft / left.length).toFixed(4), 
+            rmsR: Math.sqrt(sumRight / right.length).toFixed(4) 
+          });
           
           // Defensive copy
           monoData = sourceChannel.slice();
@@ -91,11 +115,13 @@ export class AudioWorkletRecorder {
         this.recordedChunks.push(new Float32Array(monoData));
         this.accumulatedSamples += monoData.length;
 
-        // Check if we have enough samples for a chunk (in native sample rate)
-        const nativeSliceSamples = Math.floor(this.nativeSampleRate * (this.timesliceMs / 1000));
-        
-        if (this.accumulatedSamples >= nativeSliceSamples) {
-          this.emitChunk();
+        // Auto modes: emit chunk when timeslice reached
+        // Manual mode: only emit when markChunk() is called
+        if (this.mode !== 'manual') {
+          const nativeSliceSamples = Math.floor(this.nativeSampleRate * (this.timesliceMs / 1000));
+          if (this.accumulatedSamples >= nativeSliceSamples) {
+            this.emitChunk();
+          }
         }
       };
 
@@ -107,7 +133,8 @@ export class AudioWorkletRecorder {
       this.processorNode.connect(silentNode);
       silentNode.connect(this.audioContext.destination);
 
-      console.log('🎙️ AudioWorkletRecorder started (streaming mode)', {
+      console.log('🎙️ AudioWorkletRecorder started', {
+        mode: this.mode,
         nativeSampleRate: this.audioContext.sampleRate,
         targetSampleRate: this.targetSampleRate,
         timesliceMs: this.timesliceMs,
@@ -140,20 +167,39 @@ export class AudioWorkletRecorder {
 
     // Encode to WAV
     const wavBlob = this.encodeWAV(downsampledAudio, this.targetSampleRate);
+    const durationSec = downsampledAudio.length / this.targetSampleRate;
 
     console.log('📼 AW chunk emitted', {
       type: wavBlob.type,
       size: wavBlob.size,
       sizeKB: Math.round(wavBlob.size / 1024),
-      durationSec: downsampledAudio.length / this.targetSampleRate,
+      durationSec,
     });
 
-    // Emit chunk
+    // Emit chunk (for real-time transcription)
     this.onChunk?.(wavBlob);
+    
+    // Emit chunk with duration (for storage)
+    this.onChunkReady?.(wavBlob, durationSec);
 
     // Reset buffer
     this.recordedChunks = [];
     this.accumulatedSamples = 0;
+  }
+
+  /**
+   * Mark current buffer as a chunk (manual mode)
+   */
+  markChunk(): void {
+    if (!this.isRecording || this.mode !== 'manual') {
+      console.warn('markChunk() only works in manual mode while recording');
+      return;
+    }
+
+    if (this.recordedChunks.length > 0) {
+      this.emitChunk();
+      console.log('📍 Manual chunk marked');
+    }
   }
 
   pause(): void {
@@ -191,7 +237,7 @@ export class AudioWorkletRecorder {
       this.audioContext = null;
     }
 
-    console.log('🛑 AudioWorkletRecorder stopped (streaming mode)');
+    console.log('🛑 AudioWorkletRecorder stopped');
 
     // Return empty blob (real data was sent via onChunk)
     const emptyBlob = new Blob([], { type: 'audio/wav' });
@@ -235,13 +281,6 @@ export class AudioWorkletRecorder {
       offsetResult++;
       offsetBuffer = nextOffsetBuffer;
     }
-
-    console.log('⬇️ Downsampled', {
-      from: sourceSampleRate,
-      to: targetSampleRate,
-      originalLength: buffer.length,
-      newLength: result.length,
-    });
 
     return result;
   }

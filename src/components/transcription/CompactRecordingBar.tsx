@@ -64,6 +64,7 @@ export const CompactRecordingBar = ({
     pauseRecording,
     resumeRecording,
     stopRecording,
+    markChunk,
     isSupported,
   } = useAudioRecording();
 
@@ -138,11 +139,9 @@ export const CompactRecordingBar = ({
   };
 
   const handleStart = async () => {
-    // Pre-load the Whisper pipeline before recording starts
     try {
       const { initWhisper } = await import('@/lib/whisperService');
       await initWhisper(selectedModel);
-      console.log('✅ Pipeline pre-loaded:', selectedModel);
     } catch (error) {
       console.error('Failed to pre-load pipeline:', error);
       toast({
@@ -150,11 +149,19 @@ export const CompactRecordingBar = ({
         description: `Impossible de charger le modèle ${selectedModel}. Vérifiez qu'il est téléchargé.`,
         variant: "destructive"
       });
-      return; // Don't start recording if model can't load
+      return;
     }
     
     startRealTimeTranscription();
-    await startRecording(enableStereo, processAudioChunk);
+    const { addChunk } = useAudioChunks({ sessionId, clientId });
+    await startRecording({ 
+      enableStereo, 
+      onAudioChunk: processAudioChunk,
+      mode: recordingMode,
+      onChunkReady: async (blob, duration) => {
+        await addChunk(blob, duration, 'recorded');
+      }
+    });
   };
 
   const handleStop = async () => {
