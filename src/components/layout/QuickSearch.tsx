@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
 import { useClients } from "@/hooks/useClients";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Search, Check, ChevronsUpDown, User } from "lucide-react";
+import { Search, Check, ChevronsUpDown, User, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PatientDialog } from "@/components/patients/PatientDialog";
 
 interface QuickSearchProps {
   onClientSelect: (clientId: string) => void;
@@ -14,6 +15,7 @@ interface QuickSearchProps {
 export const QuickSearch = ({ onClientSelect, selectedClientId }: QuickSearchProps) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { clients, loading } = useClients();
   
   const activeClient = clients.find(c => c.id === selectedClientId);
@@ -80,6 +82,19 @@ export const QuickSearch = ({ onClientSelect, selectedClientId }: QuickSearchPro
                   </CommandItem>
                 ))}
               </CommandGroup>
+              <CommandSeparator />
+              <CommandGroup>
+                <CommandItem
+                  onSelect={() => {
+                    setOpen(false);
+                    setIsDialogOpen(true);
+                  }}
+                  className="text-primary"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  <span className="font-medium">Créer nouvelle fiche patient</span>
+                </CommandItem>
+              </CommandGroup>
             </CommandList>
           </Command>
         </PopoverContent>
@@ -91,6 +106,15 @@ export const QuickSearch = ({ onClientSelect, selectedClientId }: QuickSearchPro
           <span className="text-sm font-medium text-primary">{activeClient.name}</span>
         </div>
       )}
+
+      <PatientDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        patient={null}
+        onSuccess={() => {
+          setIsDialogOpen(false);
+        }}
+      />
     </div>
   );
 };
