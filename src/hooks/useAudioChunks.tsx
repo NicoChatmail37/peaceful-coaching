@@ -9,7 +9,7 @@ import {
   deleteAudioChunk,
   deleteChunksBySession,
 } from '@/lib/audioChunksStorage';
-import { transcribeAudio } from '@/lib/whisperService';
+import { transcribeAudio, type WhisperModel } from '@/lib/whisperService';
 import { toast } from 'sonner';
 
 interface UseAudioChunksOptions {
@@ -76,7 +76,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
    * Transcribe a specific chunk
    */
   const transcribeChunk = useCallback(
-    async (chunkId: string, modelId: string = 'Xenova/whisper-base'): Promise<void> => {
+    async (chunkId: string, modelId: WhisperModel = 'base'): Promise<void> => {
       setIsTranscribing(prev => ({ ...prev, [chunkId]: true }));
 
       try {
@@ -91,7 +91,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
         }
 
         console.log('🎤 Transcribing chunk:', chunkId);
-        const result = await transcribeAudio(chunk.blob, { model: modelId as any });
+        const result = await transcribeAudio(chunk.blob, { model: modelId });
 
         if (!result.text || result.text.trim() === '') {
           throw new Error('Transcription vide');
@@ -115,7 +115,7 @@ export const useAudioChunks = (options: UseAudioChunksOptions = {}) => {
    * Transcribe all untranscribed chunks in session
    */
   const transcribeAllChunks = useCallback(
-    async (modelId: string = 'Xenova/whisper-base'): Promise<void> => {
+    async (modelId: WhisperModel = 'base'): Promise<void> => {
       const untranscribed = chunks.filter(c => !c.transcribed);
 
       if (untranscribed.length === 0) {

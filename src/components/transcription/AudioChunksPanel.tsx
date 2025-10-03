@@ -31,23 +31,28 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
+  Mic,
+  FileAudio,
+  Play,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import type { WhisperModel } from "@/lib/whisperService";
 
 interface AudioChunksPanelProps {
   sessionId?: string;
   clientId?: string;
   clientName?: string;
-  whisperModel?: string;
+  whisperModel?: WhisperModel;
 }
 
 export const AudioChunksPanel = ({
   sessionId,
   clientId,
-  clientName,
-  whisperModel = 'Xenova/whisper-base',
+  clientName = 'Client',
+  whisperModel = 'base',
 }: AudioChunksPanelProps) => {
   const {
     chunks,
@@ -222,7 +227,7 @@ export const AudioChunksPanel = ({
   return (
     <Card className="h-full flex flex-col">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Music className="h-5 w-5" />
@@ -234,7 +239,7 @@ export const AudioChunksPanel = ({
               {untranscribedCount > 0 && ` · ${untranscribedCount} non transcrit(s)`}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-1">
             <Button
               variant="outline"
               size="sm"

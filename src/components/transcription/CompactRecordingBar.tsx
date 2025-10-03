@@ -40,6 +40,7 @@ interface CompactRecordingBarProps {
   disabled?: boolean;
   sessionId: string;
   clientId: string;
+  clientName?: string;
 }
 
 export const CompactRecordingBar = ({
@@ -47,7 +48,8 @@ export const CompactRecordingBar = ({
   onSummaryGenerated,
   disabled = false,
   sessionId,
-  clientId
+  clientId,
+  clientName = 'Client'
 }: CompactRecordingBarProps) => {
   const [enableStereo, setEnableStereo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -421,6 +423,8 @@ export const CompactRecordingBar = ({
               <AudioChunksPanel 
                 sessionId={sessionId} 
                 clientId={clientId}
+                clientName={clientName}
+                whisperModel={selectedModel}
               />
             </SheetContent>
           </Sheet>
