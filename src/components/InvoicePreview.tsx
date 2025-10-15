@@ -274,10 +274,11 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
               </div>
             </div>
 
-            {/* Titre et référence */}
+            {/* Titre */}
             <div className="mb-8">
-              <h1 className="text-lg font-bold mb-2">{new Date().getFullYear()}54{String(new Date().getMonth() + 1).padStart(2, '0')}000 Décompte de cotisations 1er trimestre {new Date().getFullYear()}</h1>
-              <p className="text-sm text-muted-foreground">36096-1200</p>
+              <h1 className="text-lg font-bold">
+                Facture de vos séances (n° {invoice.number})
+              </h1>
             </div>
 
             {/* Tableau des prestations */}
@@ -285,24 +286,22 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b-2 border-gray-300">
-                    <th className="text-left py-3 px-2 text-xs font-medium">LIBELLÉ</th>
-                    <th className="text-center py-3 px-2 text-xs font-medium">PÉRIODE</th>
-                    <th className="text-right py-3 px-2 text-xs font-medium">BASE OU<br/>MONTANT DU</th>
-                    <th className="text-right py-3 px-2 text-xs font-medium">DÉJÀ FACTURÉ</th>
-                    <th className="text-right py-3 px-2 text-xs font-medium">BASE</th>
-                    <th className="text-right py-3 px-2 text-xs font-medium">TAUX</th>
-                    <th className="text-right py-3 px-2 text-xs font-medium">MONTANT</th>
+                    <th className="text-left py-3 px-2 text-xs font-medium w-[50%]">LIBELLÉ</th>
+                    <th className="py-3 px-2 text-xs font-medium w-[25%] text-center" style={{ paddingLeft: '1.5rem' }}>DATE</th>
+                    <th className="text-right py-3 px-2 text-xs font-medium w-[25%]">MONTANT</th>
                   </tr>
                 </thead>
                 <tbody>
                   {invoice.items.map((item, index) => (
                     <tr key={index} className="border-b border-gray-200">
                       <td className="py-2 px-2 text-xs">{item.description}</td>
-                      <td className="py-2 px-2 text-xs text-center">{new Date(invoice.date).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
-                      <td className="py-2 px-2 text-xs text-right">{item.price.toFixed(2)}</td>
-                      <td className="py-2 px-2 text-xs text-right">-</td>
-                      <td className="py-2 px-2 text-xs text-right">{item.price.toFixed(2)}</td>
-                      <td className="py-2 px-2 text-xs text-right">{item.quantity.toFixed(2)}</td>
+                      <td className="py-2 px-2 text-xs text-center" style={{ paddingLeft: '1.5rem' }}>
+                        {new Date(invoice.date).toLocaleDateString('fr-CH', { 
+                          day: '2-digit', 
+                          month: '2-digit', 
+                          year: 'numeric' 
+                        })}
+                      </td>
                       <td className="py-2 px-2 text-xs text-right font-medium">{item.total.toFixed(2)}</td>
                     </tr>
                   ))}

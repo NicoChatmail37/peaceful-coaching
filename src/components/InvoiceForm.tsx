@@ -16,6 +16,7 @@ import { Client } from "@/hooks/useClients";
 import { Product } from "@/hooks/useProducts";
 import { useCompany } from "@/hooks/useCompany";
 import { useInvoices, FullInvoice } from "@/hooks/useInvoices";
+import { supabase } from "@/integrations/supabase/client";
 
 interface InvoiceFormProps {
   onInvoiceCreate: (invoice: Invoice) => void;
@@ -135,7 +136,28 @@ export const InvoiceForm = ({ onInvoiceCreate }: InvoiceFormProps) => {
     }
 
     const { subtotal, tva, totalWithTva } = calculateTotals();
-    const invoiceNumber = `F-${Date.now()}`;
+    
+    // Generate invoice number: YYYY-XXX (year + counter)
+    const year = new Date().getFullYear();
+    
+    // Fetch existing invoices for current year to determine next counter
+    const { data: yearInvoices } = await supabase
+      .from('invoices')
+      .select('number')
+      .eq('company_id', activeCompany.id)
+      .like('number', `${year}-%`)
+      .order('number', { ascending: false })
+      .limit(1);
+    
+    let counter = 1;
+    if (yearInvoices && yearInvoices.length > 0) {
+      // Extract counter from last invoice number (format: YYYY-XXX)
+      const lastNumber = yearInvoices[0].number;
+      const lastCounter = parseInt(lastNumber.split('-')[1]);
+      counter = lastCounter + 1;
+    }
+    
+    const invoiceNumber = `${year}-${String(counter).padStart(3, '0')}`;
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
