@@ -117,9 +117,9 @@ export const QRBill = ({ invoice }: QRBillProps) => {
     return lines.join(CRLF);
   };
 
-  // --- taille QR en mm (35 mm) → pixels pour le canvas (net à l'impression)
+  // --- taille QR en mm (46 mm selon specs officielles Swiss QR Bill)
   const MM = 3.7795275591; // 1 mm ≈ 3.78 px @96dpi (approx pour canvas)
-  const QR_MM = 35; // Taille réduite pour 35mm au lieu de 46mm
+  const QR_MM = 46; // Taille officielle selon Style Guide SIX
   const deviceScale = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
   const QR_PX = Math.round(QR_MM * MM * deviceScale); // pixels réels du canvas
 
@@ -159,116 +159,153 @@ export const QRBill = ({ invoice }: QRBillProps) => {
   return (
     <div 
       className="border-2 border-dashed border-muted-foreground/20 bg-white"
-      style={{ width: '190mm', maxWidth: '190mm' }}
+      style={{ width: '210mm', maxWidth: '210mm' }}
     >
-      {/* padding global */}
-      <div style={{ padding: '5mm' }}>
-        {/* Hauteur standard de la bande QR : 105mm */}
-        <div className="flex" style={{ height: '105mm' }}>
-          
-          {/* 1) Récépissé – 62mm */}
-          <div style={{ width: '62mm', paddingRight: '3mm' }}
-               className="flex flex-col border-r border-muted-foreground/30">
-            <div className="text-xs font-semibold mb-2">Récépissé</div>
-
-            <div className="text-[8px] mb-3">
-              <div className="font-medium mb-1">Compte / Payable à</div>
-              <div className="leading-tight">
-                <div>{formatIBAN(activeCompany?.iban || '')}</div>
-                <div>{activeCompany?.name}</div>
-                <div>{activeCompany?.address}</div>
-                <div>{activeCompany?.npa} {activeCompany?.city}</div>
-              </div>
-            </div>
-
-            <div className="text-[8px] mb-3">
-              <div className="font-medium mb-1">Payable par (nom/adresse)</div>
-              <div className="border-b border-gray-300 h-4 mb-1"></div>
-              <div className="border-b border-gray-300 h-4 mb-1"></div>
-              <div className="border-b border-gray-300 h-4 mb-1"></div>
-            </div>
-
-            <div className="mt-auto flex justify-between items-end">
-              <div className="text-[8px]">
-                <div className="font-medium">Monnaie</div>
-                <div>CHF</div>
-              </div>
-              <div className="text-right">
-                <div className="text-[8px] font-medium">Montant</div>
-                <div className="text-sm font-bold">{invoice.totalWithTva.toFixed(2)}</div>
-              </div>
-            </div>
-
-            <div className="text-[6px] text-right mt-2">Point de dépôt</div>
+      {/* Hauteur standard de la bande QR : 105mm - conforme DIN A6/5 */}
+      <div className="flex" style={{ height: '105mm' }}>
+        
+        {/* 1) RÉCÉPISSÉ – 62mm (specs officielles) */}
+        <div 
+          style={{ width: '62mm', padding: '5mm' }}
+          className="flex flex-col border-r border-black"
+        >
+          {/* Titre "Récépissé" - 11pt bold */}
+          <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '5mm' }}>
+            Récépissé
           </div>
 
-          {/* 2) QR Code centré – 40mm pour la zone */}
-          <div style={{ width: '40mm' }}
-               className="flex flex-col items-center justify-center">
-            <div className="text-xs font-semibold mb-2">QR-facture</div>
-            <div className="relative">
-              <canvas 
-                ref={canvasRef} 
-                className="bg-white" 
-                style={{ 
-                  width: '35mm', 
-                  height: '35mm',
-                  maxWidth: '35mm',
-                  maxHeight: '35mm'
-                }}
-              />
-              {!qrGenerated && (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/50 text-muted-foreground text-xs">
-                  Génération...
-                </div>
-              )}
+          {/* Compte / Payable à - headings 6pt bold, values 8pt */}
+          <div style={{ fontSize: '6pt', marginBottom: '5mm' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '1mm' }}>Compte / Payable à</div>
+            <div style={{ fontSize: '8pt', lineHeight: '1.2' }}>
+              <div>{formatIBAN(activeCompany?.iban || '')}</div>
+              <div>{activeCompany?.name}</div>
+              <div>{activeCompany?.address}</div>
+              <div>{activeCompany?.npa} {activeCompany?.city}</div>
             </div>
-            <div className="text-[8px] mt-1 text-center">Code QR suisse</div>
           </div>
 
-          {/* 3) Section paiement – 70mm */}
-          <div style={{ width: '70mm', paddingLeft: '3mm' }}
-               className="flex flex-col">
-            <div className="text-xs font-semibold mb-4">Section de paiement</div>
-
-            <div className="text-[9px] mb-4">
-              <div className="font-medium mb-1">Compte / Payable à</div>
-              <div className="leading-tight">
-                <div>{formatIBAN(activeCompany?.iban || '')}</div>
-                <div>{activeCompany?.name}</div>
-                <div>{activeCompany?.address}</div>
-                <div>{activeCompany?.npa} {activeCompany?.city}</div>
-              </div>
+          {/* Référence (si présente) */}
+          {invoice.number && (
+            <div style={{ fontSize: '6pt', marginBottom: '5mm' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '1mm' }}>Référence</div>
+              <div style={{ fontSize: '8pt' }}>{invoice.number}</div>
             </div>
+          )}
 
-            <div className="text-[9px] mb-4">
-              <div className="font-medium mb-1">Informations supplémentaires</div>
-              <div>{invoice.notes || `Facture ${invoice.number}`}</div>
+          {/* Payable par (champs vides) */}
+          <div style={{ fontSize: '6pt', marginBottom: '5mm' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '1mm' }}>Payable par (nom/adresse)</div>
+            <div className="border-b border-gray-400" style={{ height: '3.5mm', marginBottom: '1mm' }}></div>
+            <div className="border-b border-gray-400" style={{ height: '3.5mm', marginBottom: '1mm' }}></div>
+            <div className="border-b border-gray-400" style={{ height: '3.5mm', marginBottom: '1mm' }}></div>
+          </div>
+
+          {/* Monnaie et Montant - en bas */}
+          <div className="mt-auto flex justify-between items-end" style={{ marginBottom: '5mm' }}>
+            <div style={{ fontSize: '6pt' }}>
+              <div style={{ fontWeight: 'bold' }}>Monnaie</div>
+              <div style={{ fontSize: '8pt' }}>CHF</div>
             </div>
-
-            <div className="text-[9px] mb-4">
-              <div className="font-medium mb-1">Payable par (nom/adresse)</div>
-              <div className="border-b border-gray-300 h-4 mb-1"></div>
-              <div className="border-b border-gray-300 h-4 mb-1"></div>
-              <div className="border-b border-gray-300 h-4 mb-1"></div>
-              <div className="border-b border-gray-300 h-4 mb-1"></div>
-            </div>
-
-            <div className="mt-auto flex justify-between items-end">
-              <div className="text-[9px]">
-                <div className="font-medium">Monnaie</div>
-                <div>CHF</div>
-              </div>
-              <div className="text-right">
-                <div className="text-[9px] font-medium">Montant</div>
-                <div className="text-lg font-bold">{invoice.totalWithTva.toFixed(2)}</div>
+            <div className="text-right">
+              <div style={{ fontSize: '6pt', fontWeight: 'bold' }}>Montant</div>
+              <div style={{ fontSize: '10pt', fontWeight: 'bold' }}>
+                {invoice.totalWithTva.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
           </div>
+
+          {/* Point de dépôt */}
+          <div style={{ fontSize: '6pt', textAlign: 'right' }}>Point de dépôt</div>
         </div>
 
-        <div className="mt-2 text-xs text-muted-foreground text-center">
-          ✅ QR-code Swiss QR-bill généré (structure conforme). Scanne d'abord sans impression pour valider.
+        {/* 2) SECTION DE PAIEMENT – 148mm (specs officielles) */}
+        <div 
+          style={{ width: '148mm', padding: '5mm', position: 'relative' }}
+          className="flex flex-col"
+        >
+          {/* Titre "Section de paiement" - 11pt bold */}
+          <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '5mm' }}>
+            Section de paiement
+          </div>
+
+          {/* Layout en 2 colonnes : QR Code à gauche, Infos à droite */}
+          <div className="flex gap-4" style={{ flex: 1 }}>
+            
+            {/* Colonne gauche : Swiss QR Code */}
+            <div className="flex flex-col items-center justify-center" style={{ width: '56mm' }}>
+              <div className="relative" style={{ margin: '5mm' }}>
+                <canvas 
+                  ref={canvasRef} 
+                  className="bg-white" 
+                  style={{ 
+                    width: '46mm', 
+                    height: '46mm',
+                    maxWidth: '46mm',
+                    maxHeight: '46mm'
+                  }}
+                />
+                {!qrGenerated && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted/50 text-muted-foreground" style={{ fontSize: '8pt' }}>
+                    Génération...
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: '6pt', fontWeight: 'bold', marginTop: '2mm' }}>Swiss QR Code</div>
+            </div>
+
+            {/* Colonne droite : Informations */}
+            <div className="flex flex-col flex-1" style={{ fontSize: '8pt' }}>
+              
+              {/* Compte / Payable à */}
+              <div style={{ marginBottom: '5mm' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '1mm' }}>Compte / Payable à</div>
+                <div style={{ fontSize: '10pt', lineHeight: '1.3' }}>
+                  <div>{formatIBAN(activeCompany?.iban || '')}</div>
+                  <div>{activeCompany?.name}</div>
+                  <div>{activeCompany?.address}</div>
+                  <div>{activeCompany?.npa} {activeCompany?.city}</div>
+                </div>
+              </div>
+
+              {/* Référence (si présente) */}
+              {invoice.number && (
+                <div style={{ marginBottom: '5mm' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '1mm' }}>Référence</div>
+                  <div style={{ fontSize: '10pt' }}>{invoice.number}</div>
+                </div>
+              )}
+
+              {/* Informations supplémentaires */}
+              <div style={{ marginBottom: '5mm' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '1mm' }}>Informations supplémentaires</div>
+                <div style={{ fontSize: '10pt' }}>{invoice.notes || `Facture ${invoice.number}`}</div>
+              </div>
+
+              {/* Payable par */}
+              <div style={{ marginBottom: '5mm' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '1mm' }}>Payable par (nom/adresse)</div>
+                <div className="border-b border-gray-400" style={{ height: '3.5mm', marginBottom: '1mm' }}></div>
+                <div className="border-b border-gray-400" style={{ height: '3.5mm', marginBottom: '1mm' }}></div>
+                <div className="border-b border-gray-400" style={{ height: '3.5mm', marginBottom: '1mm' }}></div>
+                <div className="border-b border-gray-400" style={{ height: '3.5mm', marginBottom: '1mm' }}></div>
+              </div>
+
+              {/* Monnaie et Montant - en bas à droite */}
+              <div className="mt-auto flex justify-between items-end">
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>Monnaie</div>
+                  <div style={{ fontSize: '10pt' }}>CHF</div>
+                </div>
+                <div className="text-right">
+                  <div style={{ fontWeight: 'bold' }}>Montant</div>
+                  <div style={{ fontSize: '14pt', fontWeight: 'bold' }}>
+                    {invoice.totalWithTva.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

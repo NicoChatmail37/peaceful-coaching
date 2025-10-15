@@ -335,9 +335,37 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
             </div>
             
 
-            {/* Ligne de séparation pour la section QR */}
-            <div className="border-t border-dashed border-gray-400 pt-8 mt-auto">
-              {/* -mx-12 neutralise le padding p-12 du CardContent pour cette section */}
+            {/* Ligne de séparation pour la section QR - Specs officielles Swiss QR Bill */}
+            <div className="mt-auto pt-8">
+              {/* Ligne de découpe avec symbole ciseaux (pour version PDF) */}
+              <div className="flex items-center gap-2 mb-4 text-muted-foreground print:hidden">
+                <div className="flex-1 border-t-2 border-dashed border-gray-400"></div>
+                <div className="flex items-center gap-2 text-xs">
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="6" cy="6" r="3"></circle>
+                    <path d="M8.12 8.12 12 12"></path>
+                    <path d="M20 4 8.12 15.88"></path>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <path d="M14.8 14.8 20 20"></path>
+                  </svg>
+                  <span>Séparer avant paiement</span>
+                </div>
+                <div className="flex-1 border-t-2 border-dashed border-gray-400"></div>
+              </div>
+              
+              {/* Ligne de perforation pour impression */}
+              <div className="border-t-2 border-dashed border-gray-400 mb-4 hidden print:block"></div>
+              
               {/* QR-Bill en bas de page dans sa position officielle */}
               <QRBill invoice={invoice} />
             </div>
