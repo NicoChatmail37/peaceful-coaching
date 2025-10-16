@@ -9,6 +9,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Play, FileText, Download, Trash2, MoreVertical, Upload, CheckCircle, Clock } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,6 +56,7 @@ export const AudioChunksHorizontalBand = ({
     removeChunk,
     downloadChunk,
     addChunk,
+    clearAllChunks,
   } = useAudioChunks({ sessionId, clientId, autoRefresh: true });
 
   const [playingChunk, setPlayingChunk] = useState<string | null>(null);
@@ -175,6 +187,14 @@ export const AudioChunksHorizontalBand = ({
     return new Blob([buffer], { type: 'audio/wav' });
   };
 
+  const handleClearAll = async () => {
+    await clearAllChunks();
+    toast({
+      title: "Morceaux supprimés",
+      description: "Tous les morceaux audio ont été effacés"
+    });
+  };
+
   if (chunks.length === 0) {
     return (
       <div className="p-3 bg-muted/20 rounded-lg border">
@@ -204,6 +224,35 @@ export const AudioChunksHorizontalBand = ({
 
   return (
     <div className="border rounded-lg bg-muted/20">
+      {/* Header with title and clear all button */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <h3 className="text-sm font-medium">Morceaux audio ({chunks.length})</h3>
+        {chunks.length > 0 && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8">
+                <Trash2 className="h-4 w-4 mr-1" />
+                Effacer tout
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer tous les morceaux ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Cette action est irréversible. Tous les {chunks.length} morceaux audio seront supprimés définitivement.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction onClick={handleClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Supprimer tout
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
+
       <ScrollArea className="w-full">
         <div className="flex gap-2 p-3">
           {/* Speaker role selector for stereo mode */}
@@ -269,17 +318,24 @@ export const AudioChunksHorizontalBand = ({
               )}
 
               <div className="flex items-center gap-1 pt-1">
-                {!chunk.transcribed && (
-                  <Button
-                    onClick={() => handleTranscribe(chunk.id)}
-                    disabled={isTranscribing[chunk.id]}
-                    size="sm"
-                    variant="default"
-                    className="h-7 flex-1 text-xs"
-                  >
-                    <FileText className="h-3 w-3 mr-1" />
-                    {isTranscribing[chunk.id] ? "..." : "Transcrire"}
-                  </Button>
+                {!chunk.transcribed ? (
+                  <div className="flex-1 bg-yellow-50 dark:bg-yellow-950 border-2 border-yellow-200 dark:border-yellow-800 rounded p-1.5 animate-pulse">
+                    <Button
+                      onClick={() => handleTranscribe(chunk.id)}
+                      disabled={isTranscribing[chunk.id]}
+                      size="sm"
+                      variant="default"
+                      className="h-7 w-full text-xs"
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      {isTranscribing[chunk.id] ? "Transcription..." : "🔥 Transcrire"}
+                    </Button>
+                  </div>
+                ) : (
+                  <Badge variant="default" className="h-7 flex-1 justify-center text-xs">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    ✅ Transcrit
+                  </Badge>
                 )}
 
                 <DropdownMenu>

@@ -166,8 +166,20 @@ export const CompactRecordingBar = ({
       enableStereo: false, // Always mono with WhisperX diarization
       onAudioChunk: processAudioChunk,
       mode: recordingMode,
+      autoChunkDuration: 150, // 2min30 chunks for auto-transcription workflow
       onChunkReady: async (blob, duration) => {
-        await addChunk(blob, duration, 'recorded');
+        // 1. Store chunk in IndexedDB
+        const chunkId = await addChunk(blob, duration, 'recorded');
+        
+        console.log(`📼 Chunk ${chunkId} enregistré (${Math.round(duration)}s)`);
+        
+        toast({
+          title: "Segment enregistré",
+          description: `Nouveau segment de ${Math.round(duration)}s prêt à transcrire`
+        });
+        
+        // 2. Refresh chunks display (transcription via bouton)
+        await refreshChunks();
       }
     });
   };

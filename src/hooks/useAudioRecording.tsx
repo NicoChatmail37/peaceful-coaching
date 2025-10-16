@@ -18,7 +18,13 @@ export interface AudioRecordingHook {
   duration: number;
   audioLevel: number;
   stereoInfo: StereoInfo;
-  startRecording: (options?: { enableStereo?: boolean; onAudioChunk?: (blob: Blob) => void; mode?: any; onChunkReady?: (blob: Blob, duration: number) => void }) => Promise<void>;
+  startRecording: (options?: { 
+    enableStereo?: boolean; 
+    onAudioChunk?: (blob: Blob) => void; 
+    mode?: any; 
+    autoChunkDuration?: number;
+    onChunkReady?: (blob: Blob, duration: number) => void 
+  }) => Promise<void>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   stopRecording: () => Promise<Blob | null>;
@@ -72,7 +78,13 @@ export function useAudioRecording(): AudioRecordingHook {
     return isChrome || isEdge;
   }, []);
 
-  const startRecording = useCallback(async (options?: { enableStereo?: boolean; onAudioChunk?: (blob: Blob) => void; mode?: any; onChunkReady?: (blob: Blob, duration: number) => void }) => {
+  const startRecording = useCallback(async (options?: { 
+    enableStereo?: boolean; 
+    onAudioChunk?: (blob: Blob) => void; 
+    mode?: any; 
+    autoChunkDuration?: number;
+    onChunkReady?: (blob: Blob, duration: number) => void 
+  }) => {
     const enableStereo = options?.enableStereo || false;
     const onAudioChunk = options?.onAudioChunk;
     if (!isSupported) {
@@ -207,6 +219,7 @@ export function useAudioRecording(): AudioRecordingHook {
       recorderRef.current = new AudioWorkletRecorder({
         sampleRate: 16000, // Whisper optimal rate
         mode: options?.mode || 'auto-60s',
+        autoChunkDuration: options?.autoChunkDuration, // Custom chunk duration (e.g., 150s)
         onChunk: (blob) => {
           console.log('📼 AW chunk received in hook', { 
             type: blob.type, 

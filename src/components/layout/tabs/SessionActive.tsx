@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Save, FileText, Clock, CheckCircle, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { CompactRecordingBar } from "@/components/transcription/CompactRecordingBar";
 import { GlobalSessionReport } from "@/components/transcription/GlobalSessionReport";
 import { AudioChunksHorizontalBand } from "@/components/transcription/AudioChunksHorizontalBand";
+import { LiveDialogueView } from "@/components/transcription/LiveDialogueView";
 
 interface SessionActiveProps {
   sessionId: string;
@@ -200,16 +202,31 @@ export const SessionActive = ({ sessionId, clientId }: SessionActiveProps) => {
 
           <Separator />
 
-          {/* Transcript */}
+          {/* Dialogue View with Tabs */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Transcript / Audio</label>
-            <Textarea
-              value={transcriptText}
-              onChange={(e) => setTranscriptText(e.target.value)}
-              placeholder="Transcript de la séance (généré automatiquement ou manuel)..."
-              className="min-h-32"
-              disabled={session.status === 'done'}
-            />
+            <label className="text-sm font-medium">Transcript / Dialogue</label>
+            <Tabs defaultValue="dialogue" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="dialogue">💬 Dialogue en direct</TabsTrigger>
+                <TabsTrigger value="raw">📝 Texte brut</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="dialogue" className="mt-2">
+                <div className="border rounded-lg">
+                  <LiveDialogueView sessionId={sessionId} clientId={clientId} />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="raw" className="mt-2">
+                <Textarea
+                  value={transcriptText}
+                  onChange={(e) => setTranscriptText(e.target.value)}
+                  placeholder="Transcript de la séance (généré automatiquement ou manuel)..."
+                  className="min-h-64"
+                  disabled={session.status === 'done'}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
 
           <Separator />

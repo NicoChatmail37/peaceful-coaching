@@ -8,6 +8,7 @@ export type RecordingMode = 'auto-6s' | 'auto-30s' | 'auto-60s' | 'manual';
 export interface AudioWorkletRecorderOptions {
   sampleRate?: number; // Target sample rate (default: 16000 for Whisper)
   timesliceMs?: number; // Emit chunks every N milliseconds (default: 3000)
+  autoChunkDuration?: number; // Auto-chunk duration in seconds (120-180s for workflow)
   mode?: RecordingMode; // Recording mode (default: 'auto-6s')
   onChunk?: (blob: Blob) => void; // Called for each chunk during recording
   onChunkReady?: (blob: Blob, duration: number) => void; // Called when chunk is ready (for storage)
@@ -37,8 +38,11 @@ export class AudioWorkletRecorder {
     this.mode = options.mode || 'auto-6s';
     this.targetSampleRate = options.sampleRate || 16000;
     
-    // Set timeslice based on mode
-    if (this.mode === 'auto-6s') {
+    // Set timeslice based on mode or autoChunkDuration
+    if (options.autoChunkDuration) {
+      // Custom duration in seconds (e.g., 150s for 2min30)
+      this.timesliceMs = options.autoChunkDuration * 1000;
+    } else if (this.mode === 'auto-6s') {
       this.timesliceMs = 6000;
     } else if (this.mode === 'auto-30s') {
       this.timesliceMs = 30000;
