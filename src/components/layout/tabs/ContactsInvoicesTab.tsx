@@ -3,15 +3,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users, Receipt, Filter } from "lucide-react";
+import { Search, Users, Receipt, Filter, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useClients } from "@/hooks/useClients";
 import { useInvoices } from "@/hooks/useInvoices";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const ContactsInvoicesTab = () => {
   const { clients, loading: clientsLoading } = useClients();
-  const { invoices, loading: invoicesLoading } = useInvoices();
+  const { invoices, loading: invoicesLoading, deleteInvoices } = useInvoices();
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'pending' | 'paid'>('all');
@@ -25,11 +36,15 @@ export const ContactsInvoicesTab = () => {
   // Get selected client
   const selectedClient = selectedClientId ? clients.find(c => c.id === selectedClientId) : null;
 
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    await deleteInvoices([invoiceId]);
+  };
+
   // Filter invoices - show all by default, filter by client if selected
   const displayedInvoices = selectedClient 
     ? invoices.filter(invoice => {
-        // Match by client name since we don't have direct client_id relation
-        const matchesClient = invoice.clientName === selectedClient.name;
+        // Match by client_id for accurate filtering
+        const matchesClient = invoice.client_id === selectedClient.id;
         
         if (invoiceFilter === 'all') return matchesClient;
         if (invoiceFilter === 'pending') return matchesClient && invoice.status !== 'paid';
@@ -189,17 +204,43 @@ export const ContactsInvoicesTab = () => {
                             <span className="text-sm text-muted-foreground">• {invoice.clientName}</span>
                           )}
                         </div>
-                        <Badge 
-                          variant={
-                            invoice.status === 'paid' ? 'default' : 
-                            invoice.status === 'sent' ? 'secondary' : 
-                            'outline'
-                          }
-                        >
-                          {invoice.status === 'paid' ? 'Payée' :
-                           invoice.status === 'sent' ? 'Envoyée' :
-                           'Brouillon'}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={
+                              invoice.status === 'paid' ? 'default' : 
+                              invoice.status === 'sent' ? 'secondary' : 
+                              'outline'
+                            }
+                          >
+                            {invoice.status === 'paid' ? 'Payée' :
+                             invoice.status === 'sent' ? 'Envoyée' :
+                             'Brouillon'}
+                          </Badge>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Êtes-vous sûr de vouloir supprimer cette facture ? Cette action est irréversible.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteInvoice(invoice.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Supprimer
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
                       <div className="text-sm text-muted-foreground mb-2">
                         {new Date(invoice.date).toLocaleDateString()}

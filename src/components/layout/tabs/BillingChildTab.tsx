@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Receipt, Euro } from "lucide-react";
+import { Plus, Receipt, Euro, Trash2 } from "lucide-react";
 import { InvoiceForm } from "@/components/InvoiceForm";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useState } from "react";
@@ -9,13 +9,24 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Invoice } from "@/pages/Index";
 import { InvoicePreview } from "@/components/InvoicePreview";
 import { FullInvoice } from "@/hooks/useInvoices";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface BillingChildTabProps {
   clientId: string | null;
 }
 
 export const BillingChildTab = ({ clientId }: BillingChildTabProps) => {
-  const { invoices, loading } = useInvoices();
+  const { invoices, loading, deleteInvoices } = useInvoices();
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<FullInvoice | null>(null);
 
@@ -26,6 +37,13 @@ export const BillingChildTab = ({ clientId }: BillingChildTabProps) => {
 
   const handleInvoiceCreate = (invoice: Invoice) => {
     setShowInvoiceForm(false);
+  };
+
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    const success = await deleteInvoices([invoiceId]);
+    if (success) {
+      setSelectedInvoice(null);
+    }
   };
 
   if (!clientId) {
@@ -127,12 +145,39 @@ export const BillingChildTab = ({ clientId }: BillingChildTabProps) => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">Aperçu de la facture</h2>
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedInvoice(null)}
-                >
-                  Fermer
-                </Button>
+                <div className="flex gap-2">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Supprimer
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Êtes-vous sûr de vouloir supprimer cette facture ? Cette action est irréversible.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => selectedInvoice && handleDeleteInvoice(selectedInvoice.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Supprimer
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedInvoice(null)}
+                  >
+                    Fermer
+                  </Button>
+                </div>
               </div>
               
               <InvoicePreview 
