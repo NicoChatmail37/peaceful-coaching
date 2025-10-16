@@ -91,6 +91,7 @@ export const CompactRecordingBar = ({
   const { 
     chunks, 
     addChunk, 
+    transcribeChunk,
     refreshChunks 
   } = useAudioChunks({ 
     sessionId, 
@@ -173,12 +174,27 @@ export const CompactRecordingBar = ({
         
         console.log(`📼 Chunk ${chunkId} enregistré (${Math.round(duration)}s)`);
         
-        toast({
-          title: "Segment enregistré",
-          description: `Nouveau segment de ${Math.round(duration)}s prêt à transcrire`
-        });
+        // 2. AUTO-TRANSCRIPTION immédiate avec WhisperX + diarisation
+        try {
+          await transcribeChunk(chunkId, selectedModel);
+          console.log(`✅ Chunk ${chunkId} transcrit automatiquement`);
+          
+          toast({
+            title: "Segment transcrit",
+            description: `Nouveau segment de ${Math.round(duration)}s transcrit automatiquement`,
+            duration: 2000
+          });
+        } catch (error) {
+          console.error('❌ Auto-transcription failed:', error);
+          toast({
+            title: "Erreur de transcription",
+            description: `Le segment n'a pas pu être transcrit. Utilisez le bouton manuel.`,
+            variant: "destructive",
+            duration: 3000
+          });
+        }
         
-        // 2. Refresh chunks display (transcription via bouton)
+        // 3. Refresh chunks display
         await refreshChunks();
       }
     });

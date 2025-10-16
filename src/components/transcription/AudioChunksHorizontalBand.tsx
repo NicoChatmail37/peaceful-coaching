@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +63,14 @@ export const AudioChunksHorizontalBand = ({
   const [leftSpeaker, setLeftSpeaker] = useState<'Praticien' | 'Client'>('Praticien');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll vers le dernier chunk quand un nouveau arrive
+  useEffect(() => {
+    if (scrollContainerRef.current && chunks.length > 0) {
+      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+    }
+  }, [chunks.length]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -253,8 +261,11 @@ export const AudioChunksHorizontalBand = ({
         )}
       </div>
 
-      <ScrollArea className="w-full">
-        <div className="flex gap-2 p-3">
+      <div 
+        ref={scrollContainerRef}
+        className="w-full overflow-x-auto overflow-y-hidden scroll-smooth"
+      >
+        <div className="flex gap-2 p-3 min-w-min">
           {/* Speaker role selector for stereo mode */}
           {enableStereo && chunks.length > 0 && (
             <div className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border border-border">
@@ -319,18 +330,27 @@ export const AudioChunksHorizontalBand = ({
 
               <div className="flex items-center gap-1 pt-1">
                 {!chunk.transcribed ? (
-                  <div className="flex-1 bg-yellow-50 dark:bg-yellow-950 border-2 border-yellow-200 dark:border-yellow-800 rounded p-1.5 animate-pulse">
-                    <Button
-                      onClick={() => handleTranscribe(chunk.id)}
-                      disabled={isTranscribing[chunk.id]}
-                      size="sm"
-                      variant="default"
-                      className="h-7 w-full text-xs"
-                    >
-                      <FileText className="h-3 w-3 mr-1" />
-                      {isTranscribing[chunk.id] ? "Transcription..." : "🔥 Transcrire"}
-                    </Button>
-                  </div>
+                  isTranscribing[chunk.id] ? (
+                    <div className="flex-1 bg-blue-50 dark:bg-blue-950 border-2 border-blue-200 dark:border-blue-800 rounded p-1.5">
+                      <div className="flex items-center justify-center h-7 text-xs gap-2">
+                        <div className="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full" />
+                        <span>Transcription...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 bg-yellow-50 dark:bg-yellow-950 border-2 border-yellow-200 dark:border-yellow-800 rounded p-1.5 animate-pulse">
+                      <Button
+                        onClick={() => handleTranscribe(chunk.id)}
+                        disabled={isTranscribing[chunk.id]}
+                        size="sm"
+                        variant="default"
+                        className="h-7 w-full text-xs"
+                      >
+                        <FileText className="h-3 w-3 mr-1" />
+                        🔥 Transcrire
+                      </Button>
+                    </div>
+                  )
                 ) : (
                   <Badge variant="default" className="h-7 flex-1 justify-center text-xs">
                     <CheckCircle className="h-3 w-3 mr-1" />
@@ -399,7 +419,7 @@ export const AudioChunksHorizontalBand = ({
             />
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };
