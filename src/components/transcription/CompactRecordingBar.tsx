@@ -47,7 +47,6 @@ export const CompactRecordingBar = ({
   clientName = 'Client',
   onStereoChange,
 }: CompactRecordingBarProps) => {
-  const [enableStereo, setEnableStereo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedModel, setSelectedModel] = useState<WhisperModel>('tiny');
   const [modelSource, setModelSource] = useState<'browser' | 'bridge'>('browser');
@@ -86,7 +85,6 @@ export const CompactRecordingBar = ({
     sessionId,
     clientId,
     onTranscriptUpdate,
-    stereoMode: false, // Force mono after RMS downmix
     model: selectedModel
   });
 
@@ -165,7 +163,7 @@ export const CompactRecordingBar = ({
     
     startRealTimeTranscription();
     await startRecording({ 
-      enableStereo, 
+      enableStereo: false, // Always mono with WhisperX diarization
       onAudioChunk: processAudioChunk,
       mode: recordingMode,
       onChunkReady: async (blob, duration) => {
@@ -328,30 +326,6 @@ export const CompactRecordingBar = ({
           </div>
         )}
 
-        {/* Stereo indicator */}
-        {enableStereo && state === 'recording' && (
-          <div className="flex items-center gap-1 text-xs">
-            <div className="flex flex-col items-center">
-              <div className="w-8 h-1 bg-muted rounded overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 transition-all"
-                  style={{ width: `${stereoInfo.leftLevel * 100}%` }}
-                />
-              </div>
-              <span className="text-[10px] text-muted-foreground">T</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-8 h-1 bg-muted rounded overflow-hidden">
-                <div 
-                  className="h-full bg-green-500 transition-all"
-                  style={{ width: `${stereoInfo.rightLevel * 100}%` }}
-                />
-              </div>
-              <span className="text-[10px] text-muted-foreground">C</span>
-            </div>
-          </div>
-        )}
-
         <div className="flex-1" />
 
         {/* Action buttons */}
@@ -388,26 +362,17 @@ export const CompactRecordingBar = ({
         </div>
       </div>
 
-      {/* Stereo settings (collapsible) */}
+      {/* Settings (collapsible) */}
       {showSettings && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
-            <div className="flex items-center gap-2">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">Mode stéréo</span>
-                <span className="text-xs text-muted-foreground">
-                  Dialogue thérapeutique séparé par canal
-                </span>
-              </div>
+          {/* Diarization info */}
+          <div className="p-2 bg-muted/30 rounded text-xs space-y-1">
+            <div className="font-medium">WhisperX avec Diarisation</div>
+            <div className="text-muted-foreground">
+              • Identification automatique des locuteurs via WhisperX<br/>
+              • Séparation Thérapeute (SPEAKER_00) / Client (SPEAKER_01)<br/>
+              • Plus besoin d'enregistrement stéréo
             </div>
-            <Switch
-              checked={enableStereo}
-              onCheckedChange={(checked) => {
-                setEnableStereo(checked);
-                onStereoChange?.(checked);
-              }}
-              disabled={disabled || state !== 'idle'}
-            />
           </div>
           
           {/* VAD info */}

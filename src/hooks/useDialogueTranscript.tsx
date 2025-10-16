@@ -92,7 +92,7 @@ export function useDialogueTranscript(
       };
     }
 
-    // Stereo processing: simulate RMS-based channel attribution
+    // Use native WhisperX diarization if available, fallback to RMS simulation
     const messages: DialogueMessage[] = [];
     let prevSpeaker: 'therapist' | 'client' | 'unknown' | null = null;
 
@@ -100,40 +100,55 @@ export function useDialogueTranscript(
       if (segment.text.trim().length === 0) continue;
       if ((segment.end - segment.start) < minSegmentDuration) continue;
 
-      // Simulate RMS energy analysis based on stereo timing patterns
-      // This is a simplified heuristic for demo purposes
-      const segmentMidpoint = (segment.start + segment.end) / 2;
-      const timeBasedBias = Math.sin(segmentMidpoint * 0.5); // Simulate alternating pattern
-      
-      // Add some randomness to simulate real channel energy differences
-      const randomFactor = (Math.random() - 0.5) * 0.4;
-      const leftBias = timeBasedBias + randomFactor;
-      const rightBias = -timeBasedBias + randomFactor;
-      
-      // Simulate RMS energy levels
-      const leftRMS = Math.max(0, 0.5 + leftBias);
-      const rightRMS = Math.max(0, 0.5 + rightBias);
-      
-      const energyDifference = Math.abs(leftRMS - rightRMS);
-      const strongerChannel = leftRMS > rightRMS ? 'left' : 'right';
-      
-      // Determine speaker with hysteresis
-      let confidence = energyDifference;
       let speaker: 'therapist' | 'client' | 'unknown';
+      let confidence: number;
       
-      if (energyDifference < confidenceThreshold) {
-        // Low confidence, use previous speaker if available
-        speaker = prevSpeaker || 'unknown';
-        confidence = Math.max(0.2, confidence);
+      // Check if we have native speaker info from WhisperX
+      if ((segment as any).speaker) {
+        // Use native diarization from WhisperX
+        const nativeSpeaker = (segment as any).speaker;
+        switch (nativeSpeaker) {
+          case 'SPEAKER_00':
+            speaker = 'therapist';
+            confidence = 0.95;
+            break;
+          case 'SPEAKER_01':
+            speaker = 'client';
+            confidence = 0.95;
+            break;
+          default:
+            speaker = 'unknown';
+            confidence = 0.5;
+        }
+        console.log(`🎭 Native speaker: ${nativeSpeaker} → ${speaker} (confidence: ${confidence})`);
       } else {
-        // High confidence attribution
-        speaker = strongerChannel === 'left' ? 'therapist' : 'client';
-        confidence = Math.min(0.95, confidence + 0.3);
+        // Fallback to RMS simulation for backward compatibility
+        const segmentMidpoint = (segment.start + segment.end) / 2;
+        const timeBasedBias = Math.sin(segmentMidpoint * 0.5);
         
-        // Apply hysteresis - if switching speakers, require higher confidence
-        if (prevSpeaker && prevSpeaker !== speaker && energyDifference < (confidenceThreshold + hysteresisMargin)) {
-          speaker = prevSpeaker;
-          confidence = Math.max(0.4, confidence - 0.2);
+        const randomFactor = (Math.random() - 0.5) * 0.4;
+        const leftBias = timeBasedBias + randomFactor;
+        const rightBias = -timeBasedBias + randomFactor;
+        
+        const leftRMS = Math.max(0, 0.5 + leftBias);
+        const rightRMS = Math.max(0, 0.5 + rightBias);
+        
+        const energyDifference = Math.abs(leftRMS - rightRMS);
+        const strongerChannel = leftRMS > rightRMS ? 'left' : 'right';
+        
+        confidence = energyDifference;
+        
+        if (energyDifference < confidenceThreshold) {
+          speaker = prevSpeaker || 'unknown';
+          confidence = Math.max(0.2, confidence);
+        } else {
+          speaker = strongerChannel === 'left' ? 'therapist' : 'client';
+          confidence = Math.min(0.95, confidence + 0.3);
+          
+          if (prevSpeaker && prevSpeaker !== speaker && energyDifference < (confidenceThreshold + hysteresisMargin)) {
+            speaker = prevSpeaker;
+            confidence = Math.max(0.4, confidence - 0.2);
+          }
         }
       }
 

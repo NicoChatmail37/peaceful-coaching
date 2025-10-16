@@ -9,6 +9,40 @@ export interface BridgeStatus {
   model: string;
   device: string;
   compute_type?: string;
+  faster_whisper?: {
+    model: string;
+    device: string;
+    compute_type: string;
+  };
+  whisperx?: {
+    model: string;
+    device: string;
+    compute_type: string;
+    diarization_available: boolean;
+  };
+}
+
+export interface WhisperXWord {
+  start: number;
+  end: number;
+  text: string;
+  speaker?: string;
+}
+
+export interface WhisperXSegment {
+  start: number;
+  end: number;
+  text: string;
+  speaker?: string;
+  words?: WhisperXWord[];
+}
+
+export interface WhisperXTranscriptionResult {
+  model: string;
+  language: string;
+  text: string;
+  segments: WhisperXSegment[];
+  duration?: number;
 }
 
 export interface TranscriptionResult {
@@ -123,6 +157,41 @@ export async function transcribeViaBridgeStereo(
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Bridge stereo ${res.status} ${res.statusText} ${text}`);
+  }
+  
+  return res.json();
+}
+
+/**
+ * Transcrit un fichier audio via WhisperX avec diarisation
+ */
+export async function transcribeViaBridgeWhisperX(
+  file: Blob,
+  opts?: TranscriptionOptions & { diarize?: boolean }
+): Promise<WhisperXTranscriptionResult> {
+  const form = new FormData();
+  form.append("audio", file);
+  form.append("task", opts?.task ?? "transcribe");
+  form.append("diarize", opts?.diarize ? "true" : "false");
+  
+  if (opts?.language && opts.language !== "auto") {
+    form.append("language", opts.language);
+  }
+
+  const res = await fetch(`${BRIDGE_URL}/transcribe_whisperx`, {
+    method: "POST",
+    mode: "cors",
+    headers: { 
+      Authorization: `Bearer ${BRIDGE_TOKEN}` 
+    },
+    body: form,
+    credentials: "omit",
+    signal: opts?.signal,
+  });
+  
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Bridge WhisperX ${res.status} ${res.statusText} ${text}`);
   }
   
   return res.json();

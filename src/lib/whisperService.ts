@@ -75,7 +75,7 @@ export async function initWhisper(model: WhisperModel = 'tiny', onProgress?: (pr
 
 // Bridge detection and management
 // Use centralized bridge client
-import { pingBridge as pingBridgeClient, transcribeViaBridge } from '@/services/bridgeClient';
+import { pingBridge as pingBridgeClient, transcribeViaBridge, transcribeViaBridgeWhisperX } from '@/services/bridgeClient';
 
 // PATCH 3: Gate for stereo split (keep OFF until stereo PCM16 WAV is ready)
 const USE_STEREO_SPLIT = false; // Set to true when recording stereo WAV PCM16
@@ -128,24 +128,58 @@ export async function transcribeBridge(
   model: WhisperModel = 'small', 
   language: string = 'en'
 ): Promise<WhisperResult> {
-  const result = await transcribeViaBridge(audioBlob, {
-    task: 'transcribe',
-    language: language === 'en' ? language : (language === 'fr' ? 'fr' : undefined)
-  });
-  
-  // Convert bridge result to our format
-  const segments: TranscriptSegment[] = result.segments?.map((seg) => ({
-    t0: seg.start,
-    t1: seg.end,
-    text: seg.text.trim(),
-    conf: undefined
-  })) || [];
+  try {
+    // Try WhisperX with diarization first
+    console.log('🎯 Attempting WhisperX transcription with diarization...');
+    const result = await transcribeViaBridgeWhisperX(audioBlob, {
+      language: language === 'auto' ? undefined : language,
+      diarize: true
+    });
+    
+    console.log('✅ WhisperX transcription successful:', {
+      segments: result.segments.length,
+      hasSpeakers: result.segments.some(s => s.speaker)
+    });
+    
+    // Convert WhisperX result to our format with native speaker info
+    const segments: TranscriptSegment[] = result.segments.map((seg, idx) => ({
+      id: idx,
+      t0: seg.start,
+      t1: seg.end,
+      text: seg.text.trim(),
+      conf: undefined,
+      speaker: seg.speaker // Native diarization from WhisperX
+    }));
 
-  return {
-    text: result.text || '',
-    segments,
-    srt: generateSRT(segments)
-  };
+    return {
+      text: result.text,
+      segments,
+      srt: generateSRT(segments)
+    };
+  } catch (error) {
+    console.warn('⚠️ WhisperX failed, falling back to basic transcribe:', error);
+    
+    // Fallback to /transcribe classique
+    const result = await transcribeViaBridge(audioBlob, {
+      task: 'transcribe',
+      language: language === 'en' ? language : (language === 'fr' ? 'fr' : undefined)
+    });
+    
+    // Convert bridge result to our format
+    const segments: TranscriptSegment[] = result.segments?.map((seg, idx) => ({
+      id: idx,
+      t0: seg.start,
+      t1: seg.end,
+      text: seg.text.trim(),
+      conf: undefined
+    })) || [];
+
+    return {
+      text: result.text || '',
+      segments,
+      srt: generateSRT(segments)
+    };
+  }
 }
 
 export async function transcribeAudio(

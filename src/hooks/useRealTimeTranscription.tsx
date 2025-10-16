@@ -8,7 +8,6 @@ interface UseRealTimeTranscriptionProps {
   sessionId: string;
   clientId: string;
   onTranscriptUpdate: (text: string) => void;
-  stereoMode?: boolean;
   model?: WhisperModel;
 }
 
@@ -249,7 +248,6 @@ export const useRealTimeTranscription = ({
   sessionId,
   clientId,
   onTranscriptUpdate,
-  stereoMode = false,
   model = 'tiny'
 }: UseRealTimeTranscriptionProps): UseRealTimeTranscriptionResult => {
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -290,8 +288,7 @@ export const useRealTimeTranscription = ({
       console.log('🎙️ Processing audio chunk:', {
         size: audioBlob.size,
         type: audioBlob.type,
-        sizeKB: Math.round(audioBlob.size / 1024),
-        stereoMode: false // Always mono after downmix
+        sizeKB: Math.round(audioBlob.size / 1024)
       });
 
       // Transcribe the chunk (language forced to French)
@@ -405,25 +402,6 @@ export const useRealTimeTranscription = ({
         transcriptText = cleanedText;
       }
 
-      // --- Robust stereo formatting with seg.t0 ---
-      if (stereoMode && Array.isArray(result.segments) && result.segments.length) {
-        const dialogueLines = result.segments.map((seg: any, i: number) => {
-          const start = Number.isFinite(seg?.t0) ? seg.t0 : 0;
-          const segmentNumber = Math.floor(start / 5);
-          const isTherapist = segmentNumber % 2 === 0;
-          const speaker = isTherapist ? '**Thérapeute:**' : '**Client:**';
-          
-          try {
-            console.log(`🎭 Segment ${i}: ${speaker} (${start.toFixed(1)}s)`);
-          } catch {
-            console.log(`🎭 Segment ${i}: ${speaker}`);
-          }
-          
-          return `${speaker} ${seg.text ?? ""}`.trim();
-        });
-        transcriptText = dialogueLines.join('\n\n').trim();
-      }
-
       // Append to current transcript
       const newTranscript = (transcriptRef.current ? transcriptRef.current + '\n\n' : '') + transcriptText;
       transcriptRef.current = newTranscript;
@@ -453,7 +431,7 @@ export const useRealTimeTranscription = ({
     } finally {
       console.log('✅ processOne end');
     }
-  }, [clientId, onTranscriptUpdate, sessionId, stereoMode, model]);
+  }, [clientId, onTranscriptUpdate, sessionId, model]);
 
   const pump = useCallback(async () => {
     if (processingRef.current) {
@@ -692,8 +670,7 @@ export const useRealTimeTranscription = ({
     console.log('🔄 Context changed, resetting transcription state...', {
       clientId,
       sessionId,
-      model,
-      stereoMode
+      model
     });
     
     // Clear all buffers and state
@@ -709,7 +686,7 @@ export const useRealTimeTranscription = ({
     setIsTranscribing(false);
     setProgress(0);
     
-  }, [clientId, sessionId, model, stereoMode]);
+  }, [clientId, sessionId, model]);
 
   return {
     isTranscribing,

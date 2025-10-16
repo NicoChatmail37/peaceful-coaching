@@ -9,8 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, CheckCircle, XCircle, Loader2, FileAudio, Radio } from 'lucide-react';
-import { pingBridge, transcribeViaBridge, type BridgeStatus, type TranscriptionResult } from '@/services/bridgeClient';
+import { Upload, CheckCircle, XCircle, Loader2, FileAudio, Radio, Users } from 'lucide-react';
+import { pingBridge, transcribeViaBridge, transcribeViaBridgeWhisperX, type BridgeStatus, type TranscriptionResult, type WhisperXTranscriptionResult } from '@/services/bridgeClient';
 import { BRIDGE_URL } from '@/config/bridge';
 import { toast } from 'sonner';
 
@@ -26,8 +26,10 @@ export const WhisperBridgeTest = () => {
   const [language, setLanguage] = useState<"auto" | "fr" | "en">("fr");
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionResult, setTranscriptionResult] = useState<TranscriptionResult | null>(null);
+  const [whisperxResult, setWhisperxResult] = useState<WhisperXTranscriptionResult | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [copiedToSession, setCopiedToSession] = useState(false);
+  const [useDiarization, setUseDiarization] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,6 +108,7 @@ export const WhisperBridgeTest = () => {
     if (file) {
       setSelectedFile(file);
       setTranscriptionResult(null);
+      setWhisperxResult(null);
       setTranscriptionError(null);
     }
   };
@@ -124,15 +127,28 @@ export const WhisperBridgeTest = () => {
     setIsTranscribing(true);
     setTranscriptionError(null);
     setTranscriptionResult(null);
+    setWhisperxResult(null);
     setCopiedToSession(false);
 
     try {
-      const result = await transcribeViaBridge(selectedFile, {
-        task,
-        language: language === "auto" ? undefined : language
-      });
-      setTranscriptionResult(result);
-      toast.success('Transcription terminée');
+      if (useDiarization) {
+        // Use WhisperX with diarization
+        const result = await transcribeViaBridgeWhisperX(selectedFile, {
+          task,
+          language: language === "auto" ? undefined : language,
+          diarize: true
+        });
+        setWhisperxResult(result);
+        toast.success('Transcription WhisperX terminée avec diarisation');
+      } else {
+        // Use basic transcription
+        const result = await transcribeViaBridge(selectedFile, {
+          task,
+          language: language === "auto" ? undefined : language
+        });
+        setTranscriptionResult(result);
+        toast.success('Transcription terminée');
+      }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Erreur de transcription';
       setTranscriptionError(errorMsg);
@@ -143,9 +159,10 @@ export const WhisperBridgeTest = () => {
   };
 
   const handleCopyToSession = () => {
-    if (transcriptionResult?.text) {
+    const text = whisperxResult?.text || transcriptionResult?.text;
+    if (text) {
       window.dispatchEvent(new CustomEvent('bridgeTranscriptCopy', { 
-        detail: { text: transcriptionResult.text } 
+        detail: { text } 
       }));
       setCopiedToSession(true);
       toast.success('Texte copié dans la séance active');
@@ -227,6 +244,20 @@ export const WhisperBridgeTest = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Diarization Switch */}
+          <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded">
+            <Switch
+              id="use-diarization"
+              checked={useDiarization}
+              onCheckedChange={setUseDiarization}
+              disabled={!useBridge || !bridgeStatus?.ok}
+            />
+            <Label htmlFor="use-diarization" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Utiliser WhisperX avec diarisation (identification des locuteurs)
+            </Label>
+          </div>
+
           {/* Task and Language Selection */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -319,8 +350,85 @@ export const WhisperBridgeTest = () => {
             </Alert>
           )}
 
-          {/* Transcription Results */}
-          {transcriptionResult && (
+          {/* WhisperX Results with Diarization */}
+          {whisperxResult && (
+            <div className="space-y-4">
+              <Separator />
+              
+              {/* Text Result */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Texte transcrit (WhisperX):</label>
+                  <div className="flex items-center gap-2">
+                    {whisperxResult.duration && (
+                      <Badge variant="secondary">
+                        {whisperxResult.duration.toFixed(1)}s
+                      </Badge>
+                    )}
+                    <Badge variant="default">
+                      <Users className="h-3 w-3 mr-1" />
+                      Diarisation active
+                    </Badge>
+                    <Button
+                      onClick={handleCopyToSession}
+                      size="sm"
+                      variant="outline"
+                      disabled={copiedToSession}
+                    >
+                      <FileAudio className="h-4 w-4 mr-2" />
+                      {copiedToSession ? "Copié ✓" : "Copier dans la séance"}
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  value={whisperxResult.text}
+                  readOnly
+                  className="min-h-[120px] font-mono text-sm"
+                />
+              </div>
+
+              {/* Segments with Speakers */}
+              {whisperxResult.segments && whisperxResult.segments.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Segments avec identification des locuteurs ({whisperxResult.segments.length}):
+                  </label>
+                  <ScrollArea className="h-[300px] rounded-md border">
+                    <div className="p-3 space-y-2">
+                      {whisperxResult.segments.map((segment, idx) => (
+                        <div key={idx} className="text-sm space-y-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            <Badge variant="outline" className="font-mono">
+                              {formatTime(segment.start)} → {formatTime(segment.end)}
+                            </Badge>
+                            {segment.speaker && (
+                              <Badge 
+                                variant={segment.speaker === 'SPEAKER_00' ? 'default' : 'secondary'}
+                                className="gap-1"
+                              >
+                                <Users className="h-3 w-3" />
+                                {segment.speaker === 'SPEAKER_00' ? 'Thérapeute' : 
+                                 segment.speaker === 'SPEAKER_01' ? 'Client' : segment.speaker}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className={`pl-2 border-l-2 ${
+                            segment.speaker === 'SPEAKER_00' ? 'border-blue-500' :
+                            segment.speaker === 'SPEAKER_01' ? 'border-green-500' : 'border-muted'
+                          }`}>
+                            {segment.text}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Basic Transcription Results (fallback) */}
+          {transcriptionResult && !whisperxResult && (
             <div className="space-y-4">
               <Separator />
               
