@@ -129,11 +129,12 @@ export async function transcribeBridge(
   language: string = 'en'
 ): Promise<WhisperResult> {
   try {
-    // Try WhisperX with diarization first
+    // Try WhisperX with diarization first (2 speakers: praticien/client)
     console.log('🎯 Attempting WhisperX transcription with diarization...');
     const result = await transcribeViaBridgeWhisperX(audioBlob, {
       language: language === 'auto' ? undefined : language,
-      diarize: true
+      diarize: true,
+      speakers: 2 // Optimize pour praticien/client
     });
     
     console.log('✅ WhisperX transcription successful:', {

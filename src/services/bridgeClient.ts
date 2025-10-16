@@ -71,6 +71,7 @@ export interface TranscriptionOptions {
   task?: "transcribe" | "translate";
   language?: string | "auto";
   signal?: AbortSignal;
+  speakers?: number;
 }
 
 /**
@@ -122,7 +123,8 @@ export async function transcribeViaBridge(
   
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Bridge ${res.status} ${res.statusText} ${text}`);
+    console.error(`Bridge error: ${res.status} ${res.statusText}`, text);
+    throw new Error(`Bridge ${res.status} ${res.statusText}: ${text || 'Unknown error'}`);
   }
   
   return res.json();
@@ -156,7 +158,8 @@ export async function transcribeViaBridgeStereo(
   
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Bridge stereo ${res.status} ${res.statusText} ${text}`);
+    console.error(`Bridge stereo error: ${res.status} ${res.statusText}`, text);
+    throw new Error(`Bridge stereo ${res.status} ${res.statusText}: ${text || 'Unknown error'}`);
   }
   
   return res.json();
@@ -177,6 +180,11 @@ export async function transcribeViaBridgeWhisperX(
   if (opts?.language && opts.language !== "auto") {
     form.append("language", opts.language);
   }
+  
+  // Ajouter le nombre de speakers si spécifié (ex: 2 pour praticien/client)
+  if (opts?.speakers) {
+    form.append("speakers", opts.speakers.toString());
+  }
 
   const res = await fetch(`${BRIDGE_URL}/transcribe_whisperx`, {
     method: "POST",
@@ -191,7 +199,8 @@ export async function transcribeViaBridgeWhisperX(
   
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Bridge WhisperX ${res.status} ${res.statusText} ${text}`);
+    console.error(`Bridge WhisperX error: ${res.status} ${res.statusText}`, text);
+    throw new Error(`Bridge ${res.status} ${res.statusText}: ${text || 'Unknown error'}`);
   }
   
   return res.json();
