@@ -53,10 +53,19 @@ export const validateSwissIBAN = (iban: string): ValidationResult => {
   }
   
   if (cleaned.length !== 21) {
-    return { isValid: false, message: "L'IBAN suisse doit contenir exactement 21 caractères" };
+    return { isValid: false, message: `L'IBAN suisse doit contenir exactement 21 caractères (actuellement: ${cleaned.length})` };
   }
   
   if (!/^CH\d{19}$/.test(cleaned)) {
+    // Trouver les caractères non numériques après CH
+    const afterCH = cleaned.substring(2);
+    const invalidChars = afterCH.match(/[^\d]/g);
+    if (invalidChars) {
+      return { 
+        isValid: false, 
+        message: `L'IBAN suisse doit contenir uniquement des chiffres après "CH". Caractères invalides trouvés: ${invalidChars.join(', ')}` 
+      };
+    }
     return { isValid: false, message: "Format IBAN invalide" };
   }
   
