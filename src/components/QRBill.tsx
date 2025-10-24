@@ -230,10 +230,10 @@ export const QRBill = ({ invoice }: QRBillProps) => {
           </div>
 
           {/* Layout en 2 colonnes : QR Code à gauche, Infos à droite */}
-          <div className="flex gap-4" style={{ flex: 1 }}>
+          <div className="flex gap-2 items-start" style={{ flex: 1 }}>
             
             {/* Colonne gauche : Swiss QR Code */}
-            <div className="flex flex-col items-center justify-center" style={{ width: '56mm' }}>
+            <div className="flex flex-col items-center justify-start" style={{ width: '56mm', paddingTop: '0mm' }}>
               <div className="relative" style={{ margin: '5mm' }}>
                 <canvas 
                   ref={canvasRef} 
@@ -255,7 +255,7 @@ export const QRBill = ({ invoice }: QRBillProps) => {
             </div>
 
             {/* Colonne droite : Informations */}
-            <div className="flex flex-col flex-1" style={{ fontSize: '8pt' }}>
+            <div className="flex flex-col flex-1" style={{ fontSize: '8pt', paddingTop: '0mm' }}>
               
               {/* Compte / Payable à */}
               <div style={{ marginBottom: '5mm' }}>
