@@ -56,17 +56,10 @@ export const validateSwissIBAN = (iban: string): ValidationResult => {
     return { isValid: false, message: `L'IBAN suisse doit contenir exactement 21 caractères (actuellement: ${cleaned.length})` };
   }
   
-  if (!/^CH\d{19}$/.test(cleaned)) {
-    // Trouver les caractères non numériques après CH
-    const afterCH = cleaned.substring(2);
-    const invalidChars = afterCH.match(/[^\d]/g);
-    if (invalidChars) {
-      return { 
-        isValid: false, 
-        message: `L'IBAN suisse doit contenir uniquement des chiffres après "CH". Caractères invalides trouvés: ${invalidChars.join(', ')}` 
-      };
-    }
-    return { isValid: false, message: "Format IBAN invalide" };
+  // Format: CH + 2 chiffres de contrôle + 17 caractères alphanumériques (A-Z, 0-9)
+  // Selon le standard officiel SIX Group, la partie compte peut contenir des lettres
+  if (!/^CH\d{2}[A-Z0-9]{17}$/.test(cleaned)) {
+    return { isValid: false, message: "Format IBAN suisse invalide (doit être CH + 2 chiffres + 17 caractères alphanumériques)" };
   }
   
   return { isValid: true };
