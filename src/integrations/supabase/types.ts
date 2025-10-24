@@ -671,6 +671,139 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_lpp_overrides: {
+        Row: {
+          created_at: string
+          effective_from: string | null
+          employee_id: string
+          employer_share_override: number | null
+          id: string
+          notes: string | null
+          plan_id: string | null
+          risk_admin_rate_override: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string | null
+          employee_id: string
+          employer_share_override?: number | null
+          id?: string
+          notes?: string | null
+          plan_id?: string | null
+          risk_admin_rate_override?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string | null
+          employee_id?: string
+          employer_share_override?: number | null
+          id?: string
+          notes?: string | null
+          plan_id?: string | null
+          risk_admin_rate_override?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_lpp_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_lpp_overrides_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "lpp_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_replacements: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          employee_id: string
+          end_date: string
+          event_type: string
+          id: string
+          indemnity_rate: number | null
+          notes: string | null
+          replacement_employee_id: string | null
+          replacement_type: string
+          start_date: string
+          temp_first_name: string | null
+          temp_hourly_rate: number | null
+          temp_last_name: string | null
+          temp_monthly_base: number | null
+          updated_at: string | null
+          waiting_days: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          employee_id: string
+          end_date: string
+          event_type: string
+          id?: string
+          indemnity_rate?: number | null
+          notes?: string | null
+          replacement_employee_id?: string | null
+          replacement_type: string
+          start_date: string
+          temp_first_name?: string | null
+          temp_hourly_rate?: number | null
+          temp_last_name?: string | null
+          temp_monthly_base?: number | null
+          updated_at?: string | null
+          waiting_days?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          employee_id?: string
+          end_date?: string
+          event_type?: string
+          id?: string
+          indemnity_rate?: number | null
+          notes?: string | null
+          replacement_employee_id?: string | null
+          replacement_type?: string
+          start_date?: string
+          temp_first_name?: string | null
+          temp_hourly_rate?: number | null
+          temp_last_name?: string | null
+          temp_monthly_base?: number | null
+          updated_at?: string | null
+          waiting_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_replacements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_replacements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_replacements_replacement_employee_id_fkey"
+            columns: ["replacement_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           address: string | null
@@ -689,6 +822,7 @@ export type Database = {
           hourly_rate_default: number | null
           id: string
           insurance_config_id: string | null
+          is_replacement: boolean | null
           is_student: boolean | null
           last_name: string
           lpp_enrolled: boolean | null
@@ -722,6 +856,7 @@ export type Database = {
           hourly_rate_default?: number | null
           id?: string
           insurance_config_id?: string | null
+          is_replacement?: boolean | null
           is_student?: boolean | null
           last_name: string
           lpp_enrolled?: boolean | null
@@ -755,6 +890,7 @@ export type Database = {
           hourly_rate_default?: number | null
           id?: string
           insurance_config_id?: string | null
+          is_replacement?: boolean | null
           is_student?: boolean | null
           last_name?: string
           lpp_enrolled?: boolean | null
@@ -1108,6 +1244,97 @@ export type Database = {
           },
         ]
       }
+      lpp_age_rates: {
+        Row: {
+          age_max: number
+          age_min: number
+          created_at: string
+          id: string
+          plan_id: string
+          total_saving_rate: number
+        }
+        Insert: {
+          age_max: number
+          age_min: number
+          created_at?: string
+          id?: string
+          plan_id: string
+          total_saving_rate: number
+        }
+        Update: {
+          age_max?: number
+          age_min?: number
+          created_at?: string
+          id?: string
+          plan_id?: string
+          total_saving_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lpp_age_rates_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "lpp_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lpp_plans: {
+        Row: {
+          company_id: string | null
+          coordination_deduction: number
+          created_at: string
+          default_employer_share: number
+          entry_threshold: number
+          id: string
+          is_active: boolean | null
+          max_insurable_salary: number
+          name: string
+          risk_admin_rate: number
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          company_id?: string | null
+          coordination_deduction?: number
+          created_at?: string
+          default_employer_share?: number
+          entry_threshold?: number
+          id?: string
+          is_active?: boolean | null
+          max_insurable_salary?: number
+          name: string
+          risk_admin_rate?: number
+          updated_at?: string
+          user_id: string
+          year?: number
+        }
+        Update: {
+          company_id?: string | null
+          coordination_deduction?: number
+          created_at?: string
+          default_employer_share?: number
+          entry_threshold?: number
+          id?: string
+          is_active?: boolean | null
+          max_insurable_salary?: number
+          name?: string
+          risk_admin_rate?: number
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lpp_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           company_id: string
@@ -1185,6 +1412,133 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_lpp_lines: {
+        Row: {
+          age_years: number
+          annual_gross: number
+          annual_insured_salary: number
+          company_id: string
+          created_at: string
+          employee_id: string
+          employee_risk_admin: number
+          employee_saving: number
+          employer_risk_admin: number
+          employer_saving: number
+          employer_share: number
+          id: string
+          monthly_insured_salary: number
+          payrun_id: string
+          period_month: number
+          period_year: number
+          plan_id: string
+          risk_admin_rate: number
+          saving_rate: number
+          user_id: string
+        }
+        Insert: {
+          age_years: number
+          annual_gross: number
+          annual_insured_salary: number
+          company_id: string
+          created_at?: string
+          employee_id: string
+          employee_risk_admin?: number
+          employee_saving?: number
+          employer_risk_admin?: number
+          employer_saving?: number
+          employer_share: number
+          id?: string
+          monthly_insured_salary: number
+          payrun_id: string
+          period_month: number
+          period_year: number
+          plan_id: string
+          risk_admin_rate: number
+          saving_rate: number
+          user_id: string
+        }
+        Update: {
+          age_years?: number
+          annual_gross?: number
+          annual_insured_salary?: number
+          company_id?: string
+          created_at?: string
+          employee_id?: string
+          employee_risk_admin?: number
+          employee_saving?: number
+          employer_risk_admin?: number
+          employer_saving?: number
+          employer_share?: number
+          id?: string
+          monthly_insured_salary?: number
+          payrun_id?: string
+          period_month?: number
+          period_year?: number
+          plan_id?: string
+          risk_admin_rate?: number
+          saving_rate?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_lpp_lines_payrun_id_fkey"
+            columns: ["payrun_id"]
+            isOneToOne: false
+            referencedRelation: "payruns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payrun_audit: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          change_reason: string | null
+          created_at: string | null
+          field_name: string
+          id: string
+          modified_at: string
+          modified_by: string
+          new_value: string | null
+          old_value: string | null
+          payrun_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          change_reason?: string | null
+          created_at?: string | null
+          field_name: string
+          id?: string
+          modified_at?: string
+          modified_by: string
+          new_value?: string | null
+          old_value?: string | null
+          payrun_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          change_reason?: string | null
+          created_at?: string | null
+          field_name?: string
+          id?: string
+          modified_at?: string
+          modified_by?: string
+          new_value?: string | null
+          old_value?: string | null
+          payrun_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payrun_audit_payrun_id_fkey"
+            columns: ["payrun_id"]
+            isOneToOne: false
+            referencedRelation: "payruns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payrun_benefits: {
         Row: {
           amount: number
@@ -1218,6 +1572,69 @@ export type Database = {
         }
         Relationships: []
       }
+      payrun_drafts: {
+        Row: {
+          benefits: Json | null
+          company_id: string
+          created_at: string | null
+          employee_id: string
+          gross: number | null
+          hourly_rate: number | null
+          hours: number | null
+          id: string
+          net: number | null
+          period_month: number
+          period_year: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          benefits?: Json | null
+          company_id: string
+          created_at?: string | null
+          employee_id: string
+          gross?: number | null
+          hourly_rate?: number | null
+          hours?: number | null
+          id?: string
+          net?: number | null
+          period_month: number
+          period_year: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          benefits?: Json | null
+          company_id?: string
+          created_at?: string | null
+          employee_id?: string
+          gross?: number | null
+          hourly_rate?: number | null
+          hours?: number | null
+          id?: string
+          net?: number | null
+          period_month?: number
+          period_year?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payrun_drafts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payrun_drafts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payruns: {
         Row: {
           aanp_emp: number
@@ -1250,6 +1667,9 @@ export type Database = {
           lpp_er: number
           lpp_status: string | null
           mode: string
+          modification_notes: string | null
+          modified_at: string | null
+          modified_by: string | null
           monthly_gross: number | null
           net: number
           net_calculation_mode: boolean | null
@@ -1285,6 +1705,7 @@ export type Database = {
           r7_other_compensation: number | null
           r8_gross_total: number | null
           r9_social_deductions: number | null
+          sent_at: string | null
           status: string | null
           thirteenth_amount: number | null
           thirteenth_fraction: number | null
@@ -1323,6 +1744,9 @@ export type Database = {
           lpp_er?: number
           lpp_status?: string | null
           mode: string
+          modification_notes?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
           monthly_gross?: number | null
           net?: number
           net_calculation_mode?: boolean | null
@@ -1358,6 +1782,7 @@ export type Database = {
           r7_other_compensation?: number | null
           r8_gross_total?: number | null
           r9_social_deductions?: number | null
+          sent_at?: string | null
           status?: string | null
           thirteenth_amount?: number | null
           thirteenth_fraction?: number | null
@@ -1396,6 +1821,9 @@ export type Database = {
           lpp_er?: number
           lpp_status?: string | null
           mode?: string
+          modification_notes?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
           monthly_gross?: number | null
           net?: number
           net_calculation_mode?: boolean | null
@@ -1431,6 +1859,7 @@ export type Database = {
           r7_other_compensation?: number | null
           r8_gross_total?: number | null
           r9_social_deductions?: number | null
+          sent_at?: string | null
           status?: string | null
           thirteenth_amount?: number | null
           thirteenth_fraction?: number | null
@@ -1747,6 +2176,10 @@ export type Database = {
         Args: { p_account_code: string; p_company_id: string }
         Returns: boolean
       }
+      can_modify_payrun: {
+        Args: { p_payrun_id: string; p_user_id: string }
+        Returns: Json
+      }
       compute_hourly_allowances: {
         Args: {
           p_employee_id: string
@@ -1755,10 +2188,7 @@ export type Database = {
         }
         Returns: Json
       }
-      create_default_rates_for_user: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      create_default_rates_for_user: { Args: never; Returns: undefined }
       create_session_direct: {
         Args: { p_client_id: string; p_started_at?: string }
         Returns: string
@@ -1767,10 +2197,7 @@ export type Database = {
         Args: { p_company_id: string; p_user_id: string }
         Returns: string
       }
-      is_member_company: {
-        Args: { c_id: string }
-        Returns: boolean
-      }
+      is_member_company: { Args: { c_id: string }; Returns: boolean }
       rpc_create_session: {
         Args: { p_client_id: string; p_started_at?: string }
         Returns: string
