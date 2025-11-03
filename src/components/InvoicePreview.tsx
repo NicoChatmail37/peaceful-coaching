@@ -227,7 +227,7 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
       <div className="max-w-none">
         {/* Page principale de facture */}
         <Card className="invoice-preview max-w-[210mm] mx-auto bg-white shadow-lg print:shadow-none print:border-none">
-          <CardContent className="p-12 space-y-8" style={{ minHeight: '297mm' }}>
+          <CardContent className="p-6 space-y-8" style={{ minHeight: '297mm' }}>
             {/* En-tête */}
             <div className="mb-16 grid grid-cols-2 [grid-template-rows:auto_auto_auto] gap-x-4">
               {/* Ligne 1 / Col 1 : Émetteur avec logo */}
