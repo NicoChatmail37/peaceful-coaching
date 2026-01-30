@@ -161,8 +161,8 @@ export const QRBill = ({ invoice }: QRBillProps) => {
       className="bg-white border-t-2 border-dashed border-muted-foreground/20"
       style={{ width: 'calc(100% + 48px)', marginLeft: '-24px', marginRight: '-24px' }}
     >
-      {/* Hauteur ajustée pour tenir sur la page (95mm au lieu de 105mm standard) */}
-      <div className="flex" style={{ height: '95mm' }}>
+      {/* Hauteur standard de la bande QR : 105mm - conforme DIN A6/5 */}
+      <div className="flex" style={{ height: '105mm' }}>
         
         {/* 1) RÉCÉPISSÉ – 62mm (specs officielles) */}
         <div 
