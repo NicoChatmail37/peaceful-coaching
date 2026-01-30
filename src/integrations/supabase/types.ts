@@ -18,35 +18,44 @@ export type Database = {
         Row: {
           account_code: string
           account_name: string
+          amount_net: number | null
           created_at: string
           credit: number | null
           debit: number | null
           description: string | null
           entry_id: string
           id: string
+          vat_amount: number | null
           vat_code: string | null
+          vat_rate: number | null
         }
         Insert: {
           account_code: string
           account_name: string
+          amount_net?: number | null
           created_at?: string
           credit?: number | null
           debit?: number | null
           description?: string | null
           entry_id: string
           id?: string
+          vat_amount?: number | null
           vat_code?: string | null
+          vat_rate?: number | null
         }
         Update: {
           account_code?: string
           account_name?: string
+          amount_net?: number | null
           created_at?: string
           credit?: number | null
           debit?: number | null
           description?: string | null
           entry_id?: string
           id?: string
+          vat_amount?: number | null
           vat_code?: string | null
+          vat_rate?: number | null
         }
         Relationships: [
           {
@@ -248,6 +257,7 @@ export type Database = {
           debit: number | null
           description: string | null
           entry_date: string
+          entry_type: Database["public"]["Enums"]["entry_type"] | null
           id: string
           idempotency_key: string | null
           invoice_id: string | null
@@ -267,6 +277,7 @@ export type Database = {
           debit?: number | null
           description?: string | null
           entry_date?: string
+          entry_type?: Database["public"]["Enums"]["entry_type"] | null
           id?: string
           idempotency_key?: string | null
           invoice_id?: string | null
@@ -286,6 +297,7 @@ export type Database = {
           debit?: number | null
           description?: string | null
           entry_date?: string
+          entry_type?: Database["public"]["Enums"]["entry_type"] | null
           id?: string
           idempotency_key?: string | null
           invoice_id?: string | null
@@ -438,6 +450,56 @@ export type Database = {
         }
         Relationships: []
       }
+      app_subscriptions: {
+        Row: {
+          app_name: Database["public"]["Enums"]["app_name"]
+          company_id: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          status: Database["public"]["Enums"]["subscription_status"] | null
+          stripe_product_id: string | null
+          stripe_subscription_id: string | null
+          subscribed_at: string | null
+          trial_ends_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          app_name: Database["public"]["Enums"]["app_name"]
+          company_id: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["subscription_status"] | null
+          stripe_product_id?: string | null
+          stripe_subscription_id?: string | null
+          subscribed_at?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          app_name?: Database["public"]["Enums"]["app_name"]
+          company_id?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["subscription_status"] | null
+          stripe_product_id?: string | null
+          stripe_subscription_id?: string | null
+          subscribed_at?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -570,6 +632,7 @@ export type Database = {
         Row: {
           accounting_entries_generated: boolean | null
           company_id: string | null
+          confidence_score: number | null
           created_at: string
           document_type: string
           extracted_data: Json | null
@@ -578,17 +641,22 @@ export type Database = {
           file_type: string
           filename: string
           id: string
+          parse_method: string | null
           processed_at: string | null
           processing_status: string | null
+          raw_text: string | null
           scanned_by_user_id: string | null
           status: string
+          text_hash: string | null
           updated_at: string
           user_id: string
+          validation_errors: Json | null
           validation_status: string | null
         }
         Insert: {
           accounting_entries_generated?: boolean | null
           company_id?: string | null
+          confidence_score?: number | null
           created_at?: string
           document_type?: string
           extracted_data?: Json | null
@@ -597,17 +665,22 @@ export type Database = {
           file_type: string
           filename: string
           id?: string
+          parse_method?: string | null
           processed_at?: string | null
           processing_status?: string | null
+          raw_text?: string | null
           scanned_by_user_id?: string | null
           status?: string
+          text_hash?: string | null
           updated_at?: string
           user_id: string
+          validation_errors?: Json | null
           validation_status?: string | null
         }
         Update: {
           accounting_entries_generated?: boolean | null
           company_id?: string | null
+          confidence_score?: number | null
           created_at?: string
           document_type?: string
           extracted_data?: Json | null
@@ -616,12 +689,16 @@ export type Database = {
           file_type?: string
           filename?: string
           id?: string
+          parse_method?: string | null
           processed_at?: string | null
           processing_status?: string | null
+          raw_text?: string | null
           scanned_by_user_id?: string | null
           status?: string
+          text_hash?: string | null
           updated_at?: string
           user_id?: string
+          validation_errors?: Json | null
           validation_status?: string | null
         }
         Relationships: []
@@ -2134,42 +2211,318 @@ export type Database = {
       user_preferences: {
         Row: {
           ai_api_key: string | null
+          ai_mode: string | null
           ai_provider: string
           auto_process: boolean | null
           company_id: string
           created_at: string
           default_accounts: Json | null
           id: string
+          ollama_enabled: boolean | null
+          ollama_model: string | null
+          ollama_url: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           ai_api_key?: string | null
+          ai_mode?: string | null
           ai_provider?: string
           auto_process?: boolean | null
           company_id: string
           created_at?: string
           default_accounts?: Json | null
           id?: string
+          ollama_enabled?: boolean | null
+          ollama_model?: string | null
+          ollama_url?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           ai_api_key?: string | null
+          ai_mode?: string | null
           ai_provider?: string
           auto_process?: boolean | null
           company_id?: string
           created_at?: string
           default_accounts?: Json | null
           id?: string
+          ollama_enabled?: boolean | null
+          ollama_model?: string | null
+          ollama_url?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
       }
+      vendor_templates: {
+        Row: {
+          company_id: string
+          confidence_boost: number | null
+          created_at: string | null
+          default_account_code: string | null
+          extraction_rules: Json
+          id: string
+          last_used_at: string | null
+          signature_patterns: Json
+          success_rate: number | null
+          updated_at: string | null
+          usage_count: number | null
+          user_id: string
+          vendor_key: string
+          vendor_name: string
+        }
+        Insert: {
+          company_id: string
+          confidence_boost?: number | null
+          created_at?: string | null
+          default_account_code?: string | null
+          extraction_rules?: Json
+          id?: string
+          last_used_at?: string | null
+          signature_patterns?: Json
+          success_rate?: number | null
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id: string
+          vendor_key: string
+          vendor_name: string
+        }
+        Update: {
+          company_id?: string
+          confidence_boost?: number | null
+          created_at?: string | null
+          default_account_code?: string | null
+          extraction_rules?: Json
+          id?: string
+          last_used_at?: string | null
+          signature_patterns?: Json
+          success_rate?: number | null
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string
+          vendor_key?: string
+          vendor_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      mat_view_document_confidence: {
+        Row: {
+          avg_confidence: number | null
+          company_id: string | null
+          document_type: string | null
+          high_confidence: number | null
+          low_confidence: number | null
+          medium_confidence: number | null
+          parsed_ai: number | null
+          parsed_deterministic: number | null
+          parsed_manual: number | null
+          period_month: string | null
+          total_documents: number | null
+        }
+        Relationships: []
+      }
+      mat_view_invoices_summary: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          company_id: string | null
+          invoice_count: number | null
+          month: string | null
+          total_invoiced: number | null
+          total_paid: number | null
+          total_unpaid: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mat_view_kpis_monthly: {
+        Row: {
+          cashflow_gross: number | null
+          company_id: string | null
+          month: string | null
+          result_net: number | null
+          user_id: string | null
+          vat_due: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mat_view_monthly_totals: {
+        Row: {
+          company_id: string | null
+          expense_gross: number | null
+          expense_net: number | null
+          income_gross: number | null
+          income_net: number | null
+          month: string | null
+          user_id: string | null
+          vat_input: number | null
+          vat_output: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mat_view_payroll_monthly: {
+        Row: {
+          company_id: string | null
+          employee_count: number | null
+          payslip_count: number | null
+          period_month: number | null
+          period_year: number | null
+          total_employer_cost: number | null
+          total_gross: number | null
+          total_net: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      view_account_ledger: {
+        Row: {
+          account_code: string | null
+          account_name: string | null
+          company_id: string | null
+          credit: number | null
+          debit: number | null
+          description: string | null
+          entry_date: string | null
+          running_balance: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_invoices_summary: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          company_id: string | null
+          invoice_count: number | null
+          month: string | null
+          total_invoiced: number | null
+          total_paid: number | null
+          total_unpaid: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_kpis_monthly: {
+        Row: {
+          cashflow_gross: number | null
+          company_id: string | null
+          month: string | null
+          result_net: number | null
+          user_id: string | null
+          vat_due: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_monthly_totals: {
+        Row: {
+          company_id: string | null
+          expense_gross: number | null
+          expense_net: number | null
+          income_gross: number | null
+          income_net: number | null
+          month: string | null
+          user_id: string | null
+          vat_input: number | null
+          vat_output: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_payroll_monthly: {
+        Row: {
+          company_id: string | null
+          employee_count: number | null
+          payslip_count: number | null
+          period_month: number | null
+          period_year: number | null
+          total_employer_cost: number | null
+          total_gross: number | null
+          total_net: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       account_has_entries: {
@@ -2197,7 +2550,18 @@ export type Database = {
         Args: { p_company_id: string; p_user_id: string }
         Returns: string
       }
+      has_app_access: {
+        Args: {
+          p_app_name: Database["public"]["Enums"]["app_name"]
+          p_company_id: string
+        }
+        Returns: boolean
+      }
       is_member_company: { Args: { c_id: string }; Returns: boolean }
+      refresh_all_materialized_views: { Args: never; Returns: undefined }
+      refresh_coaching_materialized_views: { Args: never; Returns: undefined }
+      refresh_compta_materialized_views: { Args: never; Returns: undefined }
+      refresh_paie_materialized_views: { Args: never; Returns: undefined }
       rpc_create_session: {
         Args: { p_client_id: string; p_started_at?: string }
         Returns: string
@@ -2229,6 +2593,9 @@ export type Database = {
     }
     Enums: {
       account_nature: "Actif" | "Passif" | "Charge" | "Produit" | "Ordre"
+      app_name: "compta" | "coaching" | "rh_paie"
+      entry_type: "income" | "expense" | "transfer" | "opening" | "closing"
+      subscription_status: "active" | "trial" | "suspended" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2357,6 +2724,9 @@ export const Constants = {
   public: {
     Enums: {
       account_nature: ["Actif", "Passif", "Charge", "Produit", "Ordre"],
+      app_name: ["compta", "coaching", "rh_paie"],
+      entry_type: ["income", "expense", "transfer", "opening", "closing"],
+      subscription_status: ["active", "trial", "suspended", "cancelled"],
     },
   },
 } as const

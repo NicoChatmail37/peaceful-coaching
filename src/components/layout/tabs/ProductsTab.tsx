@@ -1,12 +1,59 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, Edit, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, Product } from "@/hooks/useProducts";
+import { ProductDialog } from "@/components/products/ProductDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const ProductsTab = () => {
-  const { products, loading } = useProducts();
+  const { products, loading, saving, createProduct, updateProduct, deleteProduct } = useProducts();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
+  const handleCreate = () => {
+    setEditingProduct(null);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setDialogOpen(true);
+  };
+
+  const handleSave = async (data: Omit<Product, 'id'>) => {
+    if (editingProduct) {
+      await updateProduct(editingProduct.id, data);
+    } else {
+      await createProduct(data);
+    }
+  };
+
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (productToDelete) {
+      await deleteProduct(productToDelete.id);
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -33,7 +80,7 @@ export const ProductsTab = () => {
             Gérez votre catalogue de produits et services
           </p>
         </div>
-        <Button>
+        <Button onClick={handleCreate}>
           <Plus className="h-4 w-4 mr-2" />
           Nouveau produit
         </Button>
@@ -126,10 +173,10 @@ export const ProductsTab = () => {
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" onClick={() => handleEdit(product)}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" onClick={() => handleDeleteClick(product)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -143,7 +190,7 @@ export const ProductsTab = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Commencez par ajouter vos premiers produits et services
                   </p>
-                  <Button>
+                  <Button onClick={handleCreate}>
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter un produit
                   </Button>
@@ -153,6 +200,34 @@ export const ProductsTab = () => {
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Product Dialog */}
+      <ProductDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        product={editingProduct}
+        onSave={handleSave}
+        loading={saving}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce produit ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer "{productToDelete?.name}" ? 
+              Cette action ne peut pas être annulée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

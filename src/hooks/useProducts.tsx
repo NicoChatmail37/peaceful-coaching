@@ -16,6 +16,7 @@ export interface Product {
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { activeCompany } = useCompany();
 
@@ -45,6 +46,111 @@ export const useProducts = () => {
     }
   };
 
+  const createProduct = async (productData: Omit<Product, 'id'>) => {
+    if (!activeCompany) return null;
+
+    try {
+      setSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Non authentifié");
+
+      const { data, error } = await supabase
+        .from('products_services')
+        .insert({
+          ...productData,
+          company_id: activeCompany.id,
+          user_id: user.id,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Succès",
+        description: "Produit créé avec succès"
+      });
+
+      await fetchProducts();
+      return data;
+    } catch (error) {
+      console.error('Error creating product:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer le produit",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateProduct = async (id: string, productData: Partial<Omit<Product, 'id'>>) => {
+    try {
+      setSaving(true);
+      const { error } = await supabase
+        .from('products_services')
+        .update({
+          ...productData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Succès",
+        description: "Produit mis à jour"
+      });
+
+      await fetchProducts();
+      return true;
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le produit",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteProduct = async (id: string) => {
+    try {
+      setSaving(true);
+      // Soft delete - just set is_active to false
+      const { error } = await supabase
+        .from('products_services')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Succès",
+        description: "Produit supprimé"
+      });
+
+      await fetchProducts();
+      return true;
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le produit",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
   }, [activeCompany]);
@@ -52,6 +158,10 @@ export const useProducts = () => {
   return {
     products,
     loading,
-    refetch: fetchProducts
+    saving,
+    refetch: fetchProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct
   };
 };
