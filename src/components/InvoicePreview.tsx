@@ -340,7 +340,7 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
             {/* Ligne de séparation pour la section QR - Specs officielles Swiss QR Bill */}
             <div className="mt-auto pt-8">
               {/* Ligne de découpe avec symbole ciseaux (pour version PDF) */}
-              <div className="flex items-center gap-2 text-muted-foreground print:hidden" style={{ marginBottom: '5mm' }}>
+              <div className="flex items-center gap-2 text-muted-foreground print:hidden">
                 <div className="flex-1 border-t-2 border-dashed border-gray-400"></div>
                 <div className="flex items-center gap-2 text-xs">
                   <svg 
@@ -366,12 +366,10 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
               </div>
               
               {/* Ligne de perforation pour impression */}
-              <div className="border-t-2 border-dashed border-gray-400 hidden print:block" style={{ marginBottom: '5mm' }}></div>
+              <div className="border-t-2 border-dashed border-gray-400 hidden print:block"></div>
               
-              {/* QR-Bill en bas de page dans sa position officielle - margin-top négatif pour coller à la ligne */}
-              <div style={{ marginTop: '-2mm' }}>
-                <QRBill invoice={invoice} />
-              </div>
+              {/* QR-Bill directement collé à la ligne */}
+              <QRBill invoice={invoice} />
             </div>
           </CardContent>
         </Card>
