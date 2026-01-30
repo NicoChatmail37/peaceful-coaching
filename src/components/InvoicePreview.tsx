@@ -338,7 +338,7 @@ export const InvoicePreview = ({ invoice, onInvoiceStatusUpdate }: InvoicePrevie
             
 
             {/* Ligne de séparation pour la section QR - Specs officielles Swiss QR Bill */}
-            <div className="mt-auto pt-8">
+            <div className="mt-auto">
               {/* Ligne de découpe avec symbole ciseaux (pour version PDF) */}
               <div className="flex items-center gap-2 text-muted-foreground print:hidden">
                 <div className="flex-1 border-t-2 border-dashed border-gray-400"></div>
