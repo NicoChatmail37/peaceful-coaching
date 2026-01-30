@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users, Receipt, Filter, Trash2 } from "lucide-react";
+import { Search, Users, Receipt, Trash2, X, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useClients } from "@/hooks/useClients";
-import { useInvoices } from "@/hooks/useInvoices";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useInvoices, FullInvoice } from "@/hooks/useInvoices";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InvoicePreview } from "@/components/InvoicePreview";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,10 +23,11 @@ import {
 
 export const ContactsInvoicesTab = () => {
   const { clients, loading: clientsLoading } = useClients();
-  const { invoices, loading: invoicesLoading, deleteInvoices } = useInvoices();
+  const { invoices, loading: invoicesLoading, deleteInvoices, updateInvoiceStatus } = useInvoices();
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'pending' | 'paid'>('all');
+  const [selectedInvoice, setSelectedInvoice] = useState<FullInvoice | null>(null);
 
   // Filter clients by search term
   const filteredClients = clients.filter(client =>
@@ -196,9 +198,16 @@ export const ContactsInvoicesTab = () => {
               <ScrollArea className="h-96">
                 <div className="space-y-3">
                   {displayedInvoices.map((invoice) => (
-                    <div key={invoice.id} className="p-4 border rounded-lg">
+                    <div 
+                      key={invoice.id} 
+                      className={`p-4 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
+                        selectedInvoice?.id === invoice.id ? 'ring-2 ring-primary bg-primary/5' : ''
+                      }`}
+                      onClick={() => setSelectedInvoice(invoice)}
+                    >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
+                          <Eye className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">{invoice.number}</span>
                           {!selectedClient && (
                             <span className="text-sm text-muted-foreground">• {invoice.clientName}</span>
@@ -218,7 +227,11 @@ export const ContactsInvoicesTab = () => {
                           </Badge>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
@@ -232,7 +245,7 @@ export const ContactsInvoicesTab = () => {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Annuler</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => handleDeleteInvoice(invoice.id)}
+                                  onClick={() => handleDeleteInvoice(invoice.id!)}
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
                                   Supprimer
@@ -249,7 +262,7 @@ export const ContactsInvoicesTab = () => {
                         CHF {invoice.total.toFixed(2)}
                       </div>
                       {invoice.notes && (
-                        <div className="text-sm text-muted-foreground mt-2">
+                        <div className="text-sm text-muted-foreground mt-2 line-clamp-1">
                           {invoice.notes}
                         </div>
                       )}
@@ -278,6 +291,50 @@ export const ContactsInvoicesTab = () => {
           </Card>
         </div>
       </div>
+
+      {/* Panneau de prévisualisation de la facture */}
+      {selectedInvoice && (
+        <div className="w-[600px] border-l border-border bg-background p-6 overflow-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Aperçu facture {selectedInvoice.number}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedInvoice(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <InvoicePreview 
+            invoice={{
+              id: selectedInvoice.id || '',
+              number: selectedInvoice.number,
+              date: selectedInvoice.date,
+              dueDate: selectedInvoice.due_date,
+              clientName: selectedInvoice.clientName,
+              clientAddress: selectedInvoice.clientAddress,
+              clientNPA: selectedInvoice.clientNPA,
+              clientCity: selectedInvoice.clientCity,
+              items: selectedInvoice.items.map(item => ({
+                description: item.description,
+                quantity: item.quantity,
+                price: item.unit_price,
+                total: item.total
+              })),
+              total: selectedInvoice.subtotal,
+              tva: selectedInvoice.tva_amount,
+              totalWithTva: selectedInvoice.total,
+              notes: selectedInvoice.notes || '',
+              status: selectedInvoice.status
+            }}
+            onInvoiceStatusUpdate={(invoice, status) => {
+              updateInvoiceStatus(selectedInvoice.id!, status);
+              setSelectedInvoice({ ...selectedInvoice, status });
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
